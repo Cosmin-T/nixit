@@ -18,3 +18,9 @@ coverage.out
 # Built Go helpers
 bin/analyze-go
 bin/status-go
+
+# makepkg output
+packaging/aur/*/src/
+packaging/aur/*/pkg/
+packaging/aur/*/nixit/
+packaging/aur/*/*.pkg.tar.*
