@@ -98,6 +98,22 @@ make test    # Go tests + shell tests
 make check   # syntax check, shellcheck if installed, go vet
 ```
 
+## Keeping up with Mole
+
+`scripts/sync-mole.sh` pulls in new upstream Mole commits:
+
+```sh
+scripts/sync-mole.sh --check   # list what Mole changed since the last sync
+scripts/sync-mole.sh           # merge it into a new sync/mole-<date> branch
+```
+
+Changes to Mole's Go tools (`cmd/`, `internal/`) are merged automatically on a
+new branch, then nixit is built and tested; `main` is never touched and
+nothing is pushed. If Mole changed lines nixit also changed for Linux, the
+script stops with conflict markers; fix them and run
+`scripts/sync-mole.sh --finish`. Mole's shell commands were rewritten for Arch,
+so changes there are only listed, as ideas to port by hand.
+
 ## Credits
 
 - **[Mole](https://github.com/tw93/Mole)** by **[tw93](https://github.com/tw93)**
