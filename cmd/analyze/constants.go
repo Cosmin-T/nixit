@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -207,27 +207,26 @@ var foldDirs = map[string]bool{
 }
 
 var skipSystemDirs = map[string]bool{
-	"dev":                     true,
-	"tmp":                     true,
-	"private":                 true,
-	"cores":                   true,
-	"net":                     true,
-	"home":                    true,
-	"System":                  true,
-	"sbin":                    true,
-	"bin":                     true,
-	"etc":                     true,
-	"var":                     true,
-	"opt":                     false,
-	"usr":                     false,
-	"Volumes":                 true,
-	"Network":                 true,
-	".vol":                    true,
-	".Spotlight-V100":         true,
-	".fseventsd":              true,
-	".DocumentRevisions-V100": true,
-	".TemporaryItems":         true,
-	".MobileBackups":          true,
+	"dev":        true,
+	"proc":       true,
+	"sys":        true,
+	"run":        true,
+	"tmp":        true,
+	"home":       false,
+	"bin":        true,
+	"sbin":       true,
+	"lib":        true,
+	"lib64":      true,
+	"etc":        true,
+	"boot":       true,
+	"efi":        true,
+	"mnt":        true,
+	"media":      true,
+	"lost+found": true,
+	"opt":        false,
+	"usr":        false,
+	"var":        false,
+	".snapshots": true,
 }
 
 var defaultSkipDirs = map[string]bool{

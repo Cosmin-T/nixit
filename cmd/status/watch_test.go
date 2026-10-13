@@ -20,7 +20,7 @@ import (
 // Exercise the actual streaming loop in a child so its stdout and collector
 // probes stay isolated from other tests. All external commands are disabled.
 func TestStatusWatchProcess(t *testing.T) {
-	mode := os.Getenv("MOLE_STATUS_WATCH_TEST_MODE")
+	mode := os.Getenv("NIXIT_STATUS_WATCH_TEST_MODE")
 	if mode == "" {
 		t.Skip("watch subprocess helper")
 	}
@@ -72,7 +72,7 @@ func TestWatchHonorsIntervalAfterInitialSnapshot(t *testing.T) {
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestStatusWatchProcess$")
 			fixtureHome := t.TempDir()
-			cmd.Env = append(os.Environ(), "MOLE_STATUS_WATCH_TEST_MODE="+mode, "HOME="+fixtureHome, "MOLE_TEST_NO_AUTH=1")
+			cmd.Env = append(os.Environ(), "NIXIT_STATUS_WATCH_TEST_MODE="+mode, "HOME="+fixtureHome, "NIXIT_TEST_NO_AUTH=1")
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
 			stdout, err := cmd.StdoutPipe()

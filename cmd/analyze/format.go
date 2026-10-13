@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tw93/mole/internal/units"
+	"github.com/Cosmin-T/nixit/internal/units"
 )
 
 // Left-aligned block elements filling 1/8 through 7/8 of a cell, indexed by

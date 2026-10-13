@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -98,13 +98,13 @@ func TestGetDirectorySizeFromDuMeasuresUserLibraryInOneTraversal(t *testing.T) {
 	operandLog := filepath.Join(binDir, "du-operands")
 	stub := "#!/bin/sh\n" +
 		"for operand; do :; done\n" +
-		"printf '%s\\n' \"$operand\" >> \"$MOLE_TEST_DU_OPERANDS\"\n" +
+		"printf '%s\\n' \"$operand\" >> \"$NIXIT_TEST_DU_OPERANDS\"\n" +
 		"exec /usr/bin/du \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(binDir, "du"), []byte(stub), 0o755); err != nil {
 		t.Fatalf("write du stub: %v", err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("MOLE_TEST_DU_OPERANDS", operandLog)
+	t.Setenv("NIXIT_TEST_DU_OPERANDS", operandLog)
 
 	size, err := getDirectorySizeFromDuWithExcludeAndIgnores(context.Background(), library, "", overviewIgnoreNamesForPath(library))
 	if err != nil {

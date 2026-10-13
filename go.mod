@@ -1,4 +1,4 @@
-module github.com/tw93/mole
+module github.com/Cosmin-T/nixit
 
 go 1.26.0
 

@@ -1,327 +1,151 @@
-#!/bin/bash
-# Mole - Optimize command.
-# Runs system maintenance tasks.
-# Supports dry-run where applicable.
+#!/usr/bin/env bash
+# nixit optimize — routine maintenance for Arch/CachyOS.
+#
+# Usage: nixit optimize [--dry-run] [--yes]
 
-set -euo pipefail
+set -uo pipefail
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/common.sh"
 
-# User state and installed tools must never run with inherited root privileges.
-# Individual maintenance operations request administrator access themselves.
-if [[ "$EUID" -eq 0 ]]; then
-    printf '%s\n' 'Run Mole without sudo; it requests administrator access when needed.' >&2
-    exit 1
+ASSUME_YES=0
+for arg in "$@"; do
+    case "$arg" in
+        -n | --dry-run) NIXIT_DRY_RUN=1 ;;
+        -y | --yes) ASSUME_YES=1 ;;
+        -h | --help)
+            cat << EOF
+Usage: nixit optimize [--dry-run] [--yes]
+
+Pick maintenance tasks to run: refresh font, desktop and MIME caches, trim
+SSDs, clear failed services, remove a stale pacman lock, check pacnew files
+and rank mirrors.
+
+  -n, --dry-run   Show what would run without changing anything
+  -y, --yes       Run the default tasks without the picker
+  -h, --help      Show this help
+EOF
+            exit 0
+            ;;
+        *) die "Unknown option: $arg (see nixit optimize --help)" ;;
+    esac
+done
+
+export LC_ALL=C
+
+declare -A TASK_LABEL TASK_SUDO TASK_DEFAULT
+TASK_ORDER=()
+add_task() { # id label sudo(0/1) default(0/1)
+    TASK_ORDER+=("$1")
+    TASK_LABEL[$1]="$2"
+    TASK_SUDO[$1]="$3"
+    TASK_DEFAULT[$1]="$4"
+}
+
+pacman_running() { pgrep -x 'pacman|yay|paru|pamac' > /dev/null 2>&1; }
+
+discover() {
+    have fc-cache && add_task fonts "Rebuild font cache" 0 1
+    have update-desktop-database && add_task desktop "Refresh app launcher database" 0 1
+    [[ -d "${XDG_DATA_HOME:-$HOME/.local/share}/mime" ]] && have update-mime-database &&
+        add_task mime "Refresh file-type (MIME) database" 0 1
+    have kbuildsycoca6 && add_task kde "Rebuild KDE service cache" 0 1
+
+    local failed
+    failed=$(systemctl --failed --no-legend 2> /dev/null | wc -l)
+    failed=$((failed + $(systemctl --user --failed --no-legend 2> /dev/null | wc -l)))
+    ((failed > 0)) && add_task failed "Clear $failed failed service(s) (systemctl reset-failed)" 1 1
+
+    if have fstrim && ! systemctl is-enabled fstrim.timer > /dev/null 2>&1; then
+        add_task trim "Trim SSDs now (fstrim.timer is not enabled)" 1 1
+        add_task trimtimer "Enable weekly SSD trim (fstrim.timer)" 1 1
+    fi
+
+    if [[ -e /var/lib/pacman/db.lck ]] && ! pacman_running; then
+        add_task lock "Remove stale pacman lock (no package manager running)" 1 1
+    fi
+
+    local count
+    count=$(find /etc \( -name '*.pacnew' -o -name '*.pacsave' \) 2> /dev/null | wc -l)
+    ((count > 0)) && add_task pacnew "List $count .pacnew/.pacsave config file(s) to review" 0 1
+
+    have cachyos-rate-mirrors && add_task mirrors "Rank CachyOS + Arch mirrors by speed (takes a minute)" 1 0
+    have btrfs && [[ "$(findmnt -no FSTYPE /)" == "btrfs" ]] &&
+        add_task scrub "Start a btrfs scrub on / (checks data integrity in the background)" 1 0
+}
+
+task_fonts() { run_or_echo fc-cache -f; }
+task_desktop() { run_or_echo update-desktop-database -q "${XDG_DATA_HOME:-$HOME/.local/share}/applications" 2> /dev/null; }
+task_mime() { run_or_echo update-mime-database "${XDG_DATA_HOME:-$HOME/.local/share}/mime"; }
+task_kde() { run_quiet kbuildsycoca6 --noincremental; }
+task_failed() {
+    run_or_echo sudo systemctl reset-failed
+    run_or_echo systemctl --user reset-failed
+}
+task_trim() { run_or_echo sudo fstrim -av; }
+task_trimtimer() { run_or_echo sudo systemctl enable --now fstrim.timer; }
+task_lock() {
+    pacman_running && {
+        warn "A package manager started meanwhile; leaving the lock alone."
+        return
+    }
+    run_or_echo sudo rm -f /var/lib/pacman/db.lck
+}
+task_pacnew() {
+    find /etc \( -name '*.pacnew' -o -name '*.pacsave' \) 2> /dev/null | sed 's/^/  /'
+    have pacdiff && dim "  Review and merge them with: sudo DIFFPROG=\"diff -u\" pacdiff"
+}
+task_mirrors() { run_or_echo sudo cachyos-rate-mirrors; }
+task_scrub() { run_or_echo sudo btrfs scrub start / > /dev/null && dim "  Check progress with: sudo btrfs scrub status /"; }
+
+header "nixit optimize$([[ "$NIXIT_DRY_RUN" == "1" ]] && printf ' (dry run)')"
+discover
+
+lines=()
+unselected=""
+row=0
+for id in "${TASK_ORDER[@]}"; do
+    row=$((row + 1))
+    [[ "${TASK_DEFAULT[$id]}" == "1" ]] || unselected+=" $row"
+    tag=""
+    [[ "${TASK_SUDO[$id]}" == "1" ]] && tag="  ${YELLOW}sudo${NC}"
+    lines+=("$(printf '%s\t%s%s' "$id" "${TASK_LABEL[$id]}" "$tag")")
+done
+
+if [[ "$ASSUME_YES" == "1" ]]; then
+    selected=()
+    for id in "${TASK_ORDER[@]}"; do
+        [[ "${TASK_DEFAULT[$id]}" == "1" ]] && selected+=("$id")
+    done
+else
+    picked=$(printf '%s\n' "${lines[@]}" | pick_items "Optimize" \
+        "Tab toggle · Ctrl-A all · Ctrl-D none · Enter run · Esc cancel" 1 "$unselected")
+    [[ -z "$picked" ]] && {
+        dim "Nothing selected."
+        exit 0
+    }
+    mapfile -t selected < <(cut -f1 <<< "$picked")
 fi
 
-# Fix locale issues.
-export LC_ALL=C
-export LANG=C
+needs_sudo=0
+for id in "${selected[@]}"; do
+    [[ "${TASK_SUDO[$id]}" == "1" ]] && needs_sudo=1
+done
+if [[ "$needs_sudo" == "1" && "$NIXIT_DRY_RUN" != "1" ]]; then
+    ensure_sudo "system maintenance" || die "Could not get administrator access."
+fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$SCRIPT_DIR/lib/core/common.sh"
+failures=0
+for id in "${selected[@]}"; do
+    printf '%s➜%s %s\n' "$BLUE" "$NC" "${TASK_LABEL[$id]}"
+    "task_$id" || {
+        failures=$((failures + 1))
+        warn "Task failed: ${TASK_LABEL[$id]}"
+    }
+done
+stop_sudo_keepalive
 
-# Clean temp files on exit.
-trap cleanup_temp_files EXIT INT TERM
-source "$SCRIPT_DIR/lib/core/sudo.sh"
-source "$SCRIPT_DIR/lib/optimize/diagnostics.sh"
-source "$SCRIPT_DIR/lib/optimize/maintenance.sh"
-source "$SCRIPT_DIR/lib/optimize/catalog.sh"
-source "$SCRIPT_DIR/lib/optimize/tasks.sh"
-source "$SCRIPT_DIR/lib/check/health_json.sh"
-source "$SCRIPT_DIR/lib/manage/whitelist.sh"
-
-print_header() {
-    printf '\n'
-    echo -e "${PURPLE_BOLD}Optimize${NC}"
-}
-
-# Extract a simple numeric value from JSON by key without a jq dependency.
-json_get_value() {
-    local json="$1"
-    local key="$2"
-    local value
-    value=$(echo "$json" | grep -o "\"${key}\"[[:space:]]*:[[:space:]]*[0-9.]*" | head -1 | sed 's/.*:[[:space:]]*//')
-    echo "${value:-0}"
-}
-
-# Validate JSON has expected structure (basic check).
-json_validate() {
-    local json="$1"
-    # Check for required keys
-    [[ "$json" == *'"memory_used_gb"'* ]] &&
-        [[ "$json" == *'"optimizations"'* ]] &&
-        [[ "$json" == *'{'* ]] && [[ "$json" == *'}'* ]]
-}
-
-show_optimization_summary() {
-    local total
-    total=$(optimize_outcome_total)
-    if ((total == 0)); then
-        return
-    fi
-
-    local summary_title
-    local -a summary_details=()
-    local applied unchanged skipped unavailable attention failed
-    applied=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_APPLIED")
-    unchanged=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_UNCHANGED")
-    skipped=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_SKIPPED")
-    unavailable=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_UNAVAILABLE")
-    attention=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_ATTENTION")
-    failed=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_FAILED")
-
-    local -a outcome_parts=()
-    [[ $unchanged -gt 0 ]] && outcome_parts+=("$unchanged unchanged")
-    [[ $skipped -gt 0 ]] && outcome_parts+=("$skipped skipped")
-    [[ $unavailable -gt 0 ]] && outcome_parts+=("$unavailable unavailable")
-    [[ $attention -gt 0 ]] && outcome_parts+=("$attention need attention")
-    [[ $failed -gt 0 ]] && outcome_parts+=("$failed failed")
-
-    local outcome_line=""
-    if [[ ${#outcome_parts[@]} -gt 0 ]]; then
-        outcome_line="${outcome_parts[0]}"
-        local index
-        for ((index = 1; index < ${#outcome_parts[@]}; index++)); do
-            outcome_line+=" | ${outcome_parts[$index]}"
-        done
-    fi
-
-    if [[ "${MOLE_DRY_RUN:-0}" == "1" ]]; then
-        summary_title="Dry Run Complete, No Changes Made"
-        summary_details+=("Would apply ${YELLOW}${applied}${NC} optimizations")
-        [[ -n "$outcome_line" ]] && summary_details+=("$outcome_line")
-        summary_details+=("Run without ${YELLOW}--dry-run${NC} to apply these changes")
-    else
-        summary_title="Optimization Complete"
-
-        local cache_kb="${OPTIMIZE_CACHE_CLEANED_KB:-0}"
-        local db_count="${OPTIMIZE_DATABASES_COUNT:-0}"
-        local config_count="${OPTIMIZE_CONFIGS_REPAIRED:-0}"
-
-        local key_stat=""
-        if [[ "$cache_kb" =~ ^[0-9]+$ ]] && [[ "$cache_kb" -gt 0 ]]; then
-            local cache_human
-            cache_human=$(bytes_to_human "$((cache_kb * 1024))")
-            key_stat="${cache_human} cache cleaned"
-        elif [[ "$db_count" =~ ^[0-9]+$ ]] && [[ "$db_count" -gt 0 ]]; then
-            key_stat="${db_count} databases optimized"
-        elif [[ "$config_count" =~ ^[0-9]+$ ]] && [[ "$config_count" -gt 0 ]]; then
-            key_stat="${config_count} configs repaired"
-        fi
-
-        if [[ -n "$key_stat" ]]; then
-            summary_details+=("Applied ${GREEN}${applied}${NC} optimizations, ${key_stat}")
-        else
-            summary_details+=("Applied ${GREEN}${applied}${NC} optimizations")
-        fi
-
-        [[ -n "$outcome_line" ]] && summary_details+=("$outcome_line")
-        if [[ $attention -gt 0 || $failed -gt 0 ]]; then
-            summary_details+=("Review the warnings above")
-        else
-            summary_details+=("Optimization pass complete")
-        fi
-    fi
-
-    print_summary_block "$summary_title" "${summary_details[@]}"
-}
-
-show_system_health() {
-    local health_json="$1"
-
-    local mem_used=$(json_get_value "$health_json" "memory_used_gb")
-    local mem_total=$(json_get_value "$health_json" "memory_total_gb")
-    local disk_used=$(json_get_value "$health_json" "disk_used_gb")
-    local disk_total=$(json_get_value "$health_json" "disk_total_gb")
-    local disk_percent=$(json_get_value "$health_json" "disk_used_percent")
-    local uptime=$(json_get_value "$health_json" "uptime_days")
-
-    mem_used=${mem_used:-0}
-    mem_total=${mem_total:-0}
-    disk_used=${disk_used:-0}
-    disk_total=${disk_total:-0}
-    disk_percent=${disk_percent:-0}
-    uptime=${uptime:-0}
-
-    # printf parses float arguments with the locale's decimal separator, so
-    # comma-decimal locales reject dot values like "5.70" (#1220). Round in
-    # C-locale awk and print plain strings to avoid float parsing entirely.
-    local rounded
-    rounded=$(LC_ALL=C awk -v mu="$mem_used" -v mt="$mem_total" -v du="$disk_used" -v dt="$disk_total" -v ut="$uptime" \
-        'BEGIN { printf "%.0f %.0f %.0f %.0f %.0f", mu, mt, du, dt, ut }' 2> /dev/null || echo "0 0 0 0 0")
-    read -r mem_used mem_total disk_used disk_total uptime <<< "$rounded"
-
-    printf "${ICON_ADMIN} System  %s/%s GB RAM | %s/%s GB Disk | Uptime %sd\n" \
-        "$mem_used" "$mem_total" "$disk_used" "$disk_total" "$uptime"
-}
-
-announce_action() {
-    local name="$1"
-
-    if [[ "${FIRST_ACTION:-true}" == "true" ]]; then
-        export FIRST_ACTION=false
-    else
-        echo ""
-    fi
-    echo -e "${BLUE}${ICON_ARROW} ${name}${NC}"
-}
-
-cleanup_all() {
-    local exit_status="${1:-0}"
-    stop_inline_spinner 2> /dev/null || true
-    stop_sudo_session
-    cleanup_temp_files
-    # Log session end
-    local applied=0
-    local failed=0
-    if declare -F optimize_outcome_count > /dev/null; then
-        applied=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_APPLIED")
-        failed=$(optimize_outcome_count "$MOLE_OPTIMIZE_OUTCOME_FAILED")
-        local failed_action
-        while IFS= read -r failed_action; do
-            [[ -n "$failed_action" ]] || continue
-            log_operation "optimize" "TASK_FAILED" "$failed_action" "task outcome"
-        done < <(optimize_failed_actions)
-    fi
-    if [[ "$exit_status" -ne 0 && "$failed" -eq 0 ]]; then
-        local failure_action="session"
-        [[ "$exit_status" -eq 130 ]] && failure_action="interrupted"
-        log_operation "optimize" "TASK_FAILED" "$failure_action" "exit status $exit_status"
-    fi
-    log_operation_session_end "optimize" "$applied" "0"
-}
-
-handle_interrupt() {
-    trap - EXIT
-    cleanup_all 130
-    exit 130
-}
-
-main() {
-    # Set current command for operation logging
-    export MOLE_CURRENT_COMMAND="optimize"
-
-    local health_json
-    for arg in "$@"; do
-        case "$arg" in
-            "--help" | "-h")
-                show_optimize_help
-                exit 0
-                ;;
-            "--debug")
-                export MO_DEBUG=1
-                ;;
-            "--dry-run")
-                export MOLE_DRY_RUN=1
-                ;;
-            "--whitelist")
-                manage_whitelist "optimize"
-                exit 0
-                ;;
-            *)
-                echo "Unknown optimize option: $arg" >&2
-                echo "Use 'mo optimize --help' for supported options." >&2
-                exit 1
-                ;;
-        esac
-    done
-
-    log_operation_session_start "optimize"
-
-    trap 'cleanup_all "$?"' EXIT
-    trap handle_interrupt INT TERM
-
-    if [[ -t 1 ]]; then
-        clear_screen
-    fi
-    print_header
-
-    # Dry-run indicator.
-    if [[ "${MOLE_DRY_RUN:-0}" == "1" ]]; then
-        echo -e "${YELLOW}${ICON_DRY_RUN} DRY RUN MODE${NC}, No files will be modified\n"
-    fi
-
-    if ! command -v bc > /dev/null 2>&1; then
-        echo -e "${YELLOW}${ICON_ERROR}${NC} Missing dependency: bc"
-        echo -e "${GRAY}Install with: ${GREEN}brew install bc${NC}"
-        exit 1
-    fi
-
-    if [[ -t 1 ]]; then
-        start_inline_spinner "Collecting system info..."
-    fi
-
-    if ! health_json=$(generate_health_json 2> /dev/null); then
-        if [[ -t 1 ]]; then
-            stop_inline_spinner
-        fi
-        echo ""
-        log_error "Failed to collect system health data"
-        exit 1
-    fi
-
-    if ! json_validate "$health_json"; then
-        if [[ -t 1 ]]; then
-            stop_inline_spinner
-        fi
-        echo ""
-        log_error "Invalid system health data format"
-        echo -e "${GRAY}${ICON_REVIEW}${NC} Check if awk, sysctl, and df commands are available"
-        exit 1
-    fi
-
-    if [[ -t 1 ]]; then
-        stop_inline_spinner
-    fi
-
-    load_whitelist "optimize"
-    if [[ ${#CURRENT_WHITELIST_PATTERNS[@]} -gt 0 ]]; then
-        local count=${#CURRENT_WHITELIST_PATTERNS[@]}
-        if [[ $count -le 3 ]]; then
-            local patterns_list=$(
-                IFS=', '
-                echo "${CURRENT_WHITELIST_PATTERNS[*]}"
-            )
-            echo -e "${ICON_ADMIN} Active Whitelist: ${patterns_list}"
-        fi
-    fi
-
-    show_system_health "$health_json"
-
-    run_optimize_diagnostics
-
-    echo ""
-    # Track sudo availability so individual tasks can skip cleanly when admin
-    # access was denied. Without this, every sudo task re-prompts for the
-    # password and half-runs after a refusal. Default true in dry-run so the
-    # task list still expands fully for inspection.
-    export MOLE_OPTIMIZE_SUDO_AVAILABLE="false"
-    if [[ "${MOLE_DRY_RUN:-0}" == "1" ]]; then
-        MOLE_OPTIMIZE_SUDO_AVAILABLE="true"
-    elif ensure_sudo_session "System optimization requires admin access"; then
-        MOLE_OPTIMIZE_SUDO_AVAILABLE="true"
-    else
-        opt_msg "Skipping sudo-required optimizations: admin access not granted"
-    fi
-
-    export FIRST_ACTION=true
-    optimize_outcomes_reset
-    local index action health_name
-    for ((index = 0; index < ${#MOLE_OPTIMIZE_ACTIONS[@]}; index++)); do
-        action=${MOLE_OPTIMIZE_ACTIONS[$index]}
-        health_name=${MOLE_OPTIMIZE_HEALTH_NAMES[$index]}
-        announce_action "$health_name"
-        execute_optimization "$action"
-    done
-
-    if [[ "$(optimize_outcome_total)" -ne ${#MOLE_OPTIMIZE_ACTIONS[@]} ]]; then
-        log_error "Optimize task outcomes are incomplete"
-        return 1
-    fi
-
-    show_optimization_summary
-
-    printf '\n'
-    optimize_outcomes_succeeded
-}
-
-main "$@"
+printf '\n'
+if ((failures == 0)); then
+    ok "Optimize complete. Ran ${#selected[@]} task(s)."
+else
+    warn "Optimize finished with $failures failed task(s)."
+fi

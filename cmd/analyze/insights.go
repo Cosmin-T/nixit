@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// insightSystemRoot prefixes the system-wide insight paths; tests point it at a
+// temp directory.
+var insightSystemRoot = "/"
+
 // createInsightEntries returns the list of hidden-space insight entries
 // to show in the overview screen alongside the standard directory entries.
 func createInsightEntries() []dirEntry {
@@ -19,17 +23,6 @@ func createInsightEntries() []dirEntry {
 	}
 
 	var entries []dirEntry
-
-	// iOS Backups: ~/Library/Application Support/MobileSync/Backup
-	backupPath := filepath.Join(home, "Library", "Application Support", "MobileSync", "Backup")
-	if info, err := os.Stat(backupPath); err == nil && info.IsDir() {
-		entries = append(entries, dirEntry{
-			Name:  "iOS Backups",
-			Path:  backupPath,
-			IsDir: true,
-			Size:  -1,
-		})
-	}
 
 	// Old Downloads: ~/Downloads (files older than 90 days)
 	downloadsPath := filepath.Join(home, "Downloads")
@@ -42,40 +35,33 @@ func createInsightEntries() []dirEntry {
 		})
 	}
 
-	// Cleanable paths: things mo clean can remove or the user can safely delete.
-	// System Caches (~Library/Caches) is intentionally omitted here because the
-	// specific cache subdirectories below are already its children; listing both
-	// would double-count the same bytes.
+	// Cleanable paths: things nixit clean can remove or the user can safely delete.
+	// ~/.cache itself is intentionally omitted here because the specific cache
+	// subdirectories below are already its children; listing both would
+	// double-count the same bytes.
 	cleanablePaths := []struct {
 		name string
 		path string
 	}{
-		// Universal (everyone has these)
-		{"System Logs", filepath.Join(home, "Library", "Logs")},
-		{"Homebrew Cache", filepath.Join(home, "Library", "Caches", "Homebrew")},
+		{"Pacman Cache", filepath.Join(insightSystemRoot, "var", "cache", "pacman", "pkg")},
+		{"System Journal", filepath.Join(insightSystemRoot, "var", "log", "journal")},
+		{"Core Dumps", filepath.Join(insightSystemRoot, "var", "lib", "systemd", "coredump")},
+		{"Trash", filepath.Join(home, ".local", "share", "Trash")},
+		{"yay Cache", filepath.Join(home, ".cache", "yay")},
+		{"paru Cache", filepath.Join(home, ".cache", "paru")},
+		{"Thumbnails", filepath.Join(home, ".cache", "thumbnails")},
+		{"Flatpak Data", filepath.Join(insightSystemRoot, "var", "lib", "flatpak")},
+		{"Steam Shader Cache", filepath.Join(home, ".local", "share", "Steam", "steamapps", "shadercache")},
 
 		// Developer-specific (only shown if path exists)
-		{"Xcode DerivedData", filepath.Join(home, "Library", "Developer", "Xcode", "DerivedData")},
-		{"Xcode Simulators", filepath.Join(home, "Library", "Developer", "CoreSimulator", "Devices")},
-		{"Xcode Archives", filepath.Join(home, "Library", "Developer", "Xcode", "Archives")},
-		{"Spotify Cache", filepath.Join(home, "Library", "Application Support", "Spotify", "PersistentCache")},
-		{"JetBrains Cache", filepath.Join(home, "Library", "Caches", "JetBrains")},
-		{"Docker Data", filepath.Join(home, "Library", "Containers", "com.docker.docker", "Data")},
-		{"pip Cache", filepath.Join(home, "Library", "Caches", "pip")},
+		{"JetBrains Cache", filepath.Join(home, ".cache", "JetBrains")},
+		{"Docker Data", filepath.Join(insightSystemRoot, "var", "lib", "docker")},
+		{"pip Cache", filepath.Join(home, ".cache", "pip")},
 		{"uv Cache", filepath.Join(home, ".cache", "uv")},
+		{"Go Build Cache", filepath.Join(home, ".cache", "go-build")},
+		{"Cargo Registry", filepath.Join(home, ".cargo", "registry")},
+		{"npm Cache", filepath.Join(home, ".npm", "_cacache")},
 		{"Gradle Cache", filepath.Join(home, ".gradle", "caches")},
-		{"CocoaPods Cache", filepath.Join(home, "Library", "Caches", "CocoaPods")},
-	}
-	if matches, err := filepath.Glob(filepath.Join(home, "Library", "Group Containers", "*dev.orbstack", "data")); err == nil {
-		for _, match := range matches {
-			if info, statErr := os.Stat(match); statErr == nil && info.IsDir() {
-				cleanablePaths = append(cleanablePaths, struct {
-					name string
-					path string
-				}{"OrbStack Data", match})
-				break
-			}
-		}
 	}
 	for _, c := range cleanablePaths {
 		if info, err := os.Stat(c.path); err == nil && info.IsDir() {

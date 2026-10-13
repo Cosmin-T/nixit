@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// scanState describes measurement coverage within Mole's scan filters, not an
+// scanState describes measurement coverage within nixit's scan filters, not an
 // atomic filesystem snapshot. The zero value represents a complete measurement.
 type scanState uint8
 

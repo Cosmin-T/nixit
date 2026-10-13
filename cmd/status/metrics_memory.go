@@ -91,6 +91,9 @@ func getFileBackedMemory() uint64 {
 }
 
 func getMemoryPressure() string {
+	if runtime.GOOS == "linux" {
+		return linuxMemoryPressure()
+	}
 	if runtime.GOOS != "darwin" {
 		return ""
 	}

@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -13,6 +13,8 @@ import (
 func TestCreateInsightEntries(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	insightSystemRoot = t.TempDir()
+	t.Cleanup(func() { insightSystemRoot = "/" })
 	if entries := createInsightEntries(); len(entries) != 0 {
 		t.Fatalf("empty home returned %d insight entries", len(entries))
 	}
@@ -42,25 +44,28 @@ func TestCreateInsightEntries(t *testing.T) {
 	}
 }
 
-func TestCreateInsightEntriesIncludesOrbStackData(t *testing.T) {
+func TestCreateInsightEntriesIncludesPacmanCache(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	sysRoot := t.TempDir()
+	insightSystemRoot = sysRoot
+	t.Cleanup(func() { insightSystemRoot = "/" })
 
-	orbstackData := filepath.Join(home, "Library", "Group Containers", "HUAQ24HBR6.dev.orbstack", "data")
-	if err := os.MkdirAll(orbstackData, 0755); err != nil {
+	pacmanCache := filepath.Join(sysRoot, "var", "cache", "pacman", "pkg")
+	if err := os.MkdirAll(pacmanCache, 0755); err != nil {
 		t.Fatal(err)
 	}
 
 	entries := createInsightEntries()
 	for _, entry := range entries {
-		if entry.Name == "OrbStack Data" {
-			if entry.Path != orbstackData {
-				t.Fatalf("OrbStack path = %q, want %q", entry.Path, orbstackData)
+		if entry.Name == "Pacman Cache" {
+			if entry.Path != pacmanCache {
+				t.Fatalf("Pacman Cache path = %q, want %q", entry.Path, pacmanCache)
 			}
 			return
 		}
 	}
-	t.Fatal("OrbStack Data insight not found")
+	t.Fatal("Pacman Cache insight not found")
 }
 
 func TestCreateInsightEntriesIncludesUvCache(t *testing.T) {

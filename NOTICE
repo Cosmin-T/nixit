@@ -1,0 +1,25 @@
+nixit
+Copyright (C) 2026 Cosmin T.
+
+This program is a modified version of Mole (https://github.com/tw93/Mole),
+Copyright (C) tw93 and the Mole contributors, licensed under the GNU General
+Public License version 3.
+
+Changes from Mole, starting 2026-10-13:
+- Ported the Go disk analyzer (cmd/analyze) and status dashboard (cmd/status)
+  from macOS to Linux: freedesktop.org Trash, Linux protected paths and
+  overview roots, GNU du, xdg-open, sysfs/procfs hardware, GPU, thermal and
+  memory-pressure readers, and a GPU card for machines without a battery.
+- Replaced the macOS shell commands (clean, uninstall, optimize, purge) with
+  new implementations for Arch Linux and CachyOS.
+- Renamed the project to nixit and replaced Mole's mascot. "Mole" and its
+  logo are trademarks of the Mole project; nixit is not affiliated with or
+  endorsed by it.
+
+The git history before 2026-10-13 is Mole's original history, kept for
+attribution.
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.

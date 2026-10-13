@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -449,7 +449,7 @@ func (m model) View() string {
 				colorGray, colorReset)
 		}
 		if deleteCount > 1 && hasAppBundle {
-			fmt.Fprintf(&b, "%sApp bundles delete the bundle only. Use mo uninstall <App> to also remove support files.%s\n",
+			fmt.Fprintf(&b, "%sApp bundles delete the bundle only. Use nixit uninstall <App> to also remove support files.%s\n",
 				colorYellow, colorReset)
 		} else if deleteCount <= 1 && isAppBundleEntry(*m.deleteTarget) {
 			fmt.Fprintf(&b, "%sApp bundle: this deletes the bundle only. Use %s to also remove its support files.%s\n",
@@ -480,7 +480,7 @@ func isAppBundleEntry(entry dirEntry) bool {
 	return entry.IsDir && strings.EqualFold(filepath.Ext(entry.Name), ".app")
 }
 
-// uninstallCommandForApp renders a shell-safe mo uninstall invocation for an
+// uninstallCommandForApp renders a shell-safe nixit uninstall invocation for an
 // app bundle name. Simple names stay unquoted; other printable names use POSIX
 // single-quote escaping. Names that look like flags or contain control
 // characters fall back to the generic placeholder.
@@ -490,12 +490,12 @@ func uninstallCommandForApp(name string) string {
 		appName = name
 	}
 	if appName == "" || strings.HasPrefix(appName, "-") || strings.IndexFunc(appName, unicode.IsControl) >= 0 {
-		return "mo uninstall <App>"
+		return "nixit uninstall <App>"
 	}
 	if isShellSafeUnquotedAppName(appName) {
-		return "mo uninstall " + appName
+		return "nixit uninstall " + appName
 	}
-	return "mo uninstall '" + strings.ReplaceAll(appName, "'", `'\''`) + "'"
+	return "nixit uninstall '" + strings.ReplaceAll(appName, "'", `'\''`) + "'"
 }
 
 func isShellSafeUnquotedAppName(name string) bool {

@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -858,7 +858,7 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "f", "F":
-		// Reveal in Finder (multi-select aware).
+		// Reveal in the file manager (multi-select aware).
 		const maxBatchReveal = 20
 		if m.showLargeFiles {
 			if len(m.largeFiles) > 0 {
@@ -873,13 +873,13 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 							_ = safeOpen(p, true)
 						}(path)
 					}
-					m.status = fmt.Sprintf("Showing %d items in Finder...", count)
+					m.status = fmt.Sprintf("Showing %d items in the file manager...", count)
 				} else {
 					selected := m.largeFiles[m.largeSelected]
 					go func(path string) {
 						_ = safeOpen(path, true)
 					}(selected.Path)
-					m.status = fmt.Sprintf("Showing %s in Finder...", selected.Name)
+					m.status = fmt.Sprintf("Showing %s in the file manager...", selected.Name)
 				}
 			}
 		} else if len(m.entries) > 0 {
@@ -894,13 +894,13 @@ func (m model) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						_ = safeOpen(p, true)
 					}(path)
 				}
-				m.status = fmt.Sprintf("Showing %d items in Finder...", count)
+				m.status = fmt.Sprintf("Showing %d items in the file manager...", count)
 			} else {
 				selected := m.entries[m.selected]
 				go func(path string) {
 					_ = safeOpen(path, true)
 				}(selected.Path)
-				m.status = fmt.Sprintf("Showing %s in Finder...", selected.Name)
+				m.status = fmt.Sprintf("Showing %s in the file manager...", selected.Name)
 			}
 		}
 	case "p", "P":

@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -109,13 +109,13 @@ func installBlockingDuProbe(t *testing.T) string {
 	started := filepath.Join(binDir, "du-started")
 	duStub := filepath.Join(binDir, "du")
 	stub := "#!/bin/sh\n" +
-		"printf started > \"$MOLE_TEST_DU_STARTED\"\n" +
+		"printf started > \"$NIXIT_TEST_DU_STARTED\"\n" +
 		"exec /usr/bin/tail -f /dev/null\n"
 	if err := os.WriteFile(duStub, []byte(stub), 0o755); err != nil {
 		t.Fatalf("write du stub: %v", err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("MOLE_TEST_DU_STARTED", started)
+	t.Setenv("NIXIT_TEST_DU_STARTED", started)
 	return started
 }
 
@@ -453,16 +453,16 @@ func TestUninstallCommandForApp(t *testing.T) {
 		input string
 		want  string
 	}{
-		{name: "simple", input: "Safari.app", want: "mo uninstall Safari"},
-		{name: "space", input: "Google Chrome.app", want: "mo uninstall 'Google Chrome'"},
-		{name: "dollar", input: "My$App.app", want: "mo uninstall 'My$App'"},
-		{name: "command substitution", input: "Unsafe$(printf HACKED).app", want: "mo uninstall 'Unsafe$(printf HACKED)'"},
-		{name: "semicolon", input: "Foo;Bar.app", want: "mo uninstall 'Foo;Bar'"},
-		{name: "backtick", input: "My`App.app", want: "mo uninstall 'My`App'"},
-		{name: "single quote", input: "Bob's App.app", want: `mo uninstall 'Bob'\''s App'`},
-		{name: "leading dash", input: "-Example.app", want: "mo uninstall <App>"},
-		{name: "tab", input: "Tabbed\tApp.app", want: "mo uninstall <App>"},
-		{name: "newline", input: "Split\nApp.app", want: "mo uninstall <App>"},
+		{name: "simple", input: "Safari.app", want: "nixit uninstall Safari"},
+		{name: "space", input: "Google Chrome.app", want: "nixit uninstall 'Google Chrome'"},
+		{name: "dollar", input: "My$App.app", want: "nixit uninstall 'My$App'"},
+		{name: "command substitution", input: "Unsafe$(printf HACKED).app", want: "nixit uninstall 'Unsafe$(printf HACKED)'"},
+		{name: "semicolon", input: "Foo;Bar.app", want: "nixit uninstall 'Foo;Bar'"},
+		{name: "backtick", input: "My`App.app", want: "nixit uninstall 'My`App'"},
+		{name: "single quote", input: "Bob's App.app", want: `nixit uninstall 'Bob'\''s App'`},
+		{name: "leading dash", input: "-Example.app", want: "nixit uninstall <App>"},
+		{name: "tab", input: "Tabbed\tApp.app", want: "nixit uninstall <App>"},
+		{name: "newline", input: "Split\nApp.app", want: "nixit uninstall <App>"},
 	}
 
 	for _, tt := range tests {
@@ -484,7 +484,7 @@ func TestViewDeleteConfirmShowsUninstallHintForAppBundle(t *testing.T) {
 	}
 
 	view := m.View()
-	if !strings.Contains(view, "mo uninstall Safari") {
+	if !strings.Contains(view, "nixit uninstall Safari") {
 		t.Fatalf("expected app-specific uninstall command, got:\n%s", view)
 	}
 	if !strings.Contains(view, "bundle only") {
@@ -502,7 +502,7 @@ func TestViewDeleteConfirmNoHintForRegularDirectory(t *testing.T) {
 	}
 
 	view := m.View()
-	if strings.Contains(view, "mo uninstall") {
+	if strings.Contains(view, "nixit uninstall") {
 		t.Fatalf("did not expect uninstall hint for a regular directory, got:\n%s", view)
 	}
 }
@@ -519,7 +519,7 @@ func TestViewDeleteConfirmMultiSelectShowsGenericHint(t *testing.T) {
 	}
 
 	view := m.View()
-	if !strings.Contains(view, "mo uninstall <App>") {
+	if !strings.Contains(view, "nixit uninstall <App>") {
 		t.Fatalf("expected generic uninstall hint for multi-select containing an app bundle, got:\n%s", view)
 	}
 }
@@ -899,7 +899,7 @@ func TestPruneAnalyzerCacheDirEnforcesByteCap(t *testing.T) {
 	}
 }
 
-// The legacy flat store shares `~/.cache/mole` with shell-side state, so the
+// The legacy flat store shares `~/.cache/nixit` with shell-side state, so the
 // sweep is scoped to the two names the analyzer ever wrote there.
 func TestSweepLegacyAnalyzerCacheRemovesOnlyAnalyzerFiles(t *testing.T) {
 	root := t.TempDir()
@@ -1339,9 +1339,9 @@ func TestGetCacheDirIsAnalyzerScoped(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	root, err := getMoleCacheRoot()
+	root, err := getNixitCacheRoot()
 	if err != nil {
-		t.Fatalf("getMoleCacheRoot: %v", err)
+		t.Fatalf("getNixitCacheRoot: %v", err)
 	}
 	cacheDir, err := getCacheDir()
 	if err != nil {
@@ -1404,7 +1404,7 @@ func TestScanPathConcurrentWarmsChildDirectoryCache(t *testing.T) {
 
 // A cache file costs a 4KB block plus an inode to memoize what one readdir
 // returns, so cheap subtrees must not get one. Unbounded admission is what grew
-// ~/.cache/mole to 1.88M files / 7.82GB on a user's Mac.
+// ~/.cache/nixit to 1.88M files / 7.82GB on a user's Mac.
 func TestScanPathConcurrentSkipsCacheForCheapSubdir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -3012,23 +3012,22 @@ func TestIsHandledByMoClean(t *testing.T) {
 		path string
 		want bool
 	}{
-		// Paths mo clean handles.
-		{"user caches", "/Users/test/Library/Caches/com.example", true},
-		{"user logs", "/Users/test/Library/Logs/DiagnosticReports", true},
-		{"saved app state", "/Users/test/Library/Saved Application State/com.example", true},
-		{"user trash", "/Users/test/.Trash/deleted-file", true},
-		{"diagnostic reports", "/Users/test/Library/DiagnosticReports/crash.log", true},
+		// Paths nixit clean handles.
+		{"user cache", "/home/test/.cache/yay/foo", true},
+		{"trash", "/home/test/.local/share/Trash/files/old", true},
+		{"pacman cache", "/var/cache/pacman/pkg/foo.pkg.tar.zst", true},
+		{"journal", "/var/log/journal/abc/system.journal", true},
+		{"coredump", "/var/lib/systemd/coredump/core.foo.zst", true},
 
-		// Paths mo clean does NOT handle.
-		{"project node_modules", "/Users/test/project/node_modules", false},
-		{"project build", "/Users/test/project/build", false},
-		{"home directory", "/Users/test", false},
+		// Paths nixit clean does NOT handle.
+		{"project node_modules", "/home/test/project/node_modules", false},
+		{"project build", "/home/test/project/build", false},
+		{"home directory", "/home/test", false},
 		{"random path", "/some/random/path", false},
 		{"empty string", "", false},
 
-		// Partial matches should not trigger (case sensitive).
-		{"lowercase caches", "/users/test/library/caches/foo", false},
-		{"different trash path", "/Users/test/Trash/file", false}, // Missing dot prefix
+		// Partial matches should not trigger.
+		{"cache without dot", "/home/test/cache/foo", false},
 	}
 
 	for _, tt := range tests {
@@ -3066,7 +3065,7 @@ func TestIsCleanableDir(t *testing.T) {
 		{"coverage", "/Users/test/project/coverage", true},
 		{"terraform", "/Users/test/infra/.terraform", true},
 
-		// Paths handled by mo clean (should NOT be cleanable).
+		// Paths handled by nixit clean (should NOT be cleanable).
 		{"user caches", "/Users/test/Library/Caches/com.example", false},
 		{"user logs", "/Users/test/Library/Logs/app.log", false},
 		{"trash", "/Users/test/.Trash/deleted", false},
@@ -3430,11 +3429,11 @@ func TestCalculateDirSizeFastHighFanoutCompletes(t *testing.T) {
 
 func TestSystemOverviewRootsDefaultsToRealSystemPaths(t *testing.T) {
 	roots := systemOverviewRoots()
-	if len(roots) != 2 {
-		t.Fatalf("expected 2 default system roots, got %d", len(roots))
+	if len(roots) != 3 {
+		t.Fatalf("expected 3 default system roots, got %d", len(roots))
 	}
-	if roots[0].Path != "/Applications" || roots[1].Path != "/Library" {
-		t.Fatalf("unexpected default system roots: %q, %q", roots[0].Path, roots[1].Path)
+	if roots[0].Path != "/usr" || roots[1].Path != "/opt" || roots[2].Path != "/var" {
+		t.Fatalf("unexpected default system roots: %+v", roots)
 	}
 	for _, root := range roots {
 		if root.Size != -1 || !root.IsDir {
@@ -4263,7 +4262,7 @@ func countTickMsgs(t *testing.T, cmd tea.Cmd) int {
 func TestOverviewRefillsKeepOneTickLoop(t *testing.T) {
 	m := model{path: "/", isOverview: true}
 	for i := range maxConcurrentOverview + 4 {
-		m.entries = append(m.entries, dirEntry{Path: fmt.Sprintf("/nonexistent-mole-fixture/%d", i), Size: -1})
+		m.entries = append(m.entries, dirEntry{Path: fmt.Sprintf("/nonexistent-nixit-fixture/%d", i), Size: -1})
 	}
 	t.Cleanup(func() { m.cancelOverviewScans(nil) })
 	if got := countTickMsgs(t, m.scheduleOverviewScans()); got != 1 {

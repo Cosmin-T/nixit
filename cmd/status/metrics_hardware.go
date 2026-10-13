@@ -12,6 +12,9 @@ import (
 // collectFull schedules it inside its concurrent burst; finishHardware fills
 // the fields that depend on that burst's memory and disk results.
 func collectHardwareStatic() HardwareInfo {
+	if runtime.GOOS == "linux" {
+		return collectHardwareStaticLinux()
+	}
 	if runtime.GOOS != "darwin" {
 		return HardwareInfo{
 			Model:       "Unknown",
@@ -79,7 +82,7 @@ func collectHardwareStatic() HardwareInfo {
 func finishHardware(hw HardwareInfo, totalRAM uint64, disks []DiskStatus) HardwareInfo {
 	hw.TotalRAM = humanBytes(totalRAM)
 	hw.DiskSize = "Unknown"
-	if runtime.GOOS == "darwin" && len(disks) > 0 {
+	if len(disks) > 0 {
 		hw.DiskSize = humanBytes(disks[0].Total)
 	}
 	return hw

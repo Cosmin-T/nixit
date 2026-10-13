@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -16,7 +16,7 @@ func resetFlags(t *testing.T) {
 	t.Helper()
 	saved := *jsonMode
 	t.Cleanup(func() {
-		flag.CommandLine.Init("mo analyze", flag.ExitOnError)
+		flag.CommandLine.Init("nixit analyze", flag.ExitOnError)
 		*jsonMode = saved
 	})
 }
@@ -38,8 +38,8 @@ func TestParseArgsHelpGoesToStdout(t *testing.T) {
 			if stderr.Len() != 0 {
 				t.Errorf("stderr = %q, want empty: help is data, not an error", stderr.String())
 			}
-			if !strings.HasPrefix(stdout.String(), "Usage: mo analyze") {
-				t.Errorf("stdout = %q, want it to start with the mo analyze usage line", stdout.String())
+			if !strings.HasPrefix(stdout.String(), "Usage: nixit analyze") {
+				t.Errorf("stdout = %q, want it to start with the nixit analyze usage line", stdout.String())
 			}
 		})
 	}
@@ -71,7 +71,7 @@ func TestParseArgsUnknownFlagExitsOne(t *testing.T) {
 		t.Fatal("parseArgs kept going on an unknown flag, want early exit")
 	}
 	// Every bash subcommand exits 1 on a bad option; the flag package's default
-	// is 2, which made mo analyze the odd one out.
+	// is 2, which made nixit analyze the odd one out.
 	if code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
 	}
@@ -81,8 +81,8 @@ func TestParseArgsUnknownFlagExitsOne(t *testing.T) {
 	if !strings.Contains(stderr.String(), "not defined") {
 		t.Errorf("stderr = %q, want it to name the offending flag", stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "mo analyze --help") {
-		t.Errorf("stderr = %q, want it to point at mo analyze --help", stderr.String())
+	if !strings.Contains(stderr.String(), "nixit analyze --help") {
+		t.Errorf("stderr = %q, want it to point at nixit analyze --help", stderr.String())
 	}
 }
 

@@ -42,7 +42,7 @@ func TestShouldUseJSONOutput_NonTTYPipe(t *testing.T) {
 }
 
 func TestShouldUseJSONOutput_NonTTYFile(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "mole-status-stdout-*.txt")
+	tmpFile, err := os.CreateTemp("", "nixit-status-stdout-*.txt")
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestMetricsSnapshotFieldsHaveCollectionClassifications(t *testing.T) {
 // Run the real one-shot JSON path in a child so os.Exit and stdout stay
 // isolated. External commands are disabled and the process probe fails.
 func TestStatusJSONProcess(t *testing.T) {
-	if os.Getenv("MOLE_STATUS_JSON_TEST") == "" {
+	if os.Getenv("NIXIT_STATUS_JSON_TEST") == "" {
 		t.Skip("json subprocess helper")
 	}
 	runCmd = func(context.Context, string, ...string) (string, error) {
@@ -527,7 +527,7 @@ func TestStatusJSONProcess(t *testing.T) {
 	collectProcessesFunc = func() (processSample, error) {
 		return processSample{}, errors.New("process probe failed")
 	}
-	scenario := os.Getenv("MOLE_STATUS_JSON_TEST")
+	scenario := os.Getenv("NIXIT_STATUS_JSON_TEST")
 	if scenario != "1" {
 		collectCPUFunc = func() (CPUStatus, error) { return CPUStatus{}, errors.New("cpu probe failed") }
 		collectMemoryFunc = func() (MemoryStatus, error) { return MemoryStatus{}, errors.New("memory probe failed") }
@@ -549,7 +549,7 @@ func TestJSONModePrintsPartialSnapshotWhenOneCollectorFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestStatusJSONProcess$")
-	cmd.Env = append(os.Environ(), "MOLE_STATUS_JSON_TEST=1", "HOME="+t.TempDir(), "MOLE_TEST_NO_AUTH=1")
+	cmd.Env = append(os.Environ(), "NIXIT_STATUS_JSON_TEST=1", "HOME="+t.TempDir(), "NIXIT_TEST_NO_AUTH=1")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
@@ -593,7 +593,7 @@ func TestJSONModeCollectorAvailability(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestStatusJSONProcess$")
-			cmd.Env = append(os.Environ(), "MOLE_STATUS_JSON_TEST="+scenario, "HOME="+t.TempDir(), "MOLE_TEST_NO_AUTH=1")
+			cmd.Env = append(os.Environ(), "NIXIT_STATUS_JSON_TEST="+scenario, "HOME="+t.TempDir(), "NIXIT_TEST_NO_AUTH=1")
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			err := cmd.Run()

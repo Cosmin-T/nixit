@@ -17,7 +17,7 @@ func resetFlags(t *testing.T) {
 	savedThreshold, savedWindow := *procCPUThreshold, *procCPUWindow
 	savedInterval := *watchInterval
 	t.Cleanup(func() {
-		flag.CommandLine.Init("mo status", flag.ExitOnError)
+		flag.CommandLine.Init("nixit status", flag.ExitOnError)
 		*jsonOutput, *watchMode = savedJSON, savedWatch
 		*procCPUThreshold, *procCPUWindow = savedThreshold, savedWindow
 		*watchInterval = savedInterval
@@ -41,8 +41,8 @@ func TestParseArgsHelpGoesToStdout(t *testing.T) {
 			if stderr.Len() != 0 {
 				t.Errorf("stderr = %q, want empty: help is data, not an error", stderr.String())
 			}
-			if !strings.HasPrefix(stdout.String(), "Usage: mo status") {
-				t.Errorf("stdout = %q, want it to start with the mo status usage line", stdout.String())
+			if !strings.HasPrefix(stdout.String(), "Usage: nixit status") {
+				t.Errorf("stdout = %q, want it to start with the nixit status usage line", stdout.String())
 			}
 		})
 	}
@@ -103,7 +103,7 @@ func TestParseArgsRejectsBadInvocations(t *testing.T) {
 				t.Fatalf("parseArgs(%v) kept going, want early exit", tc.args)
 			}
 			// Every bash subcommand exits 1 on a bad option; the flag package's
-			// default is 2, which made mo status the odd one out.
+			// default is 2, which made nixit status the odd one out.
 			if code != 1 {
 				t.Errorf("exit code = %d, want 1", code)
 			}
@@ -113,8 +113,8 @@ func TestParseArgsRejectsBadInvocations(t *testing.T) {
 			if !strings.Contains(stderr.String(), tc.want) {
 				t.Errorf("stderr = %q, want it to mention %q", stderr.String(), tc.want)
 			}
-			if !strings.Contains(stderr.String(), "mo status --help") {
-				t.Errorf("stderr = %q, want it to point at mo status --help", stderr.String())
+			if !strings.Contains(stderr.String(), "nixit status --help") {
+				t.Errorf("stderr = %q, want it to point at nixit status --help", stderr.String())
 			}
 		})
 	}

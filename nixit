@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# nixit — clean, uninstall, optimize, analyze and monitor an Arch/CachyOS system.
+# A Linux fork of Mole (https://github.com/tw93/Mole), GPL-3.0.
+
+set -uo pipefail
+
+if [[ "$EUID" -eq 0 ]]; then
+    printf '%s\n' 'Run nixit without sudo; it asks for administrator access when needed.' >&2
+    exit 1
+fi
+
+NIXIT_ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+export NIXIT_ROOT
+source "$NIXIT_ROOT/lib/common.sh"
+
+VERSION="0.1.0"
+TAGLINE="Clean and tune your Arch system."
+
+MENU_ITEMS=(
+    "clean|Clean        Free up disk space"
+    "uninstall|Uninstall    Remove apps and their leftovers"
+    "optimize|Optimize     Refresh caches and run maintenance"
+    "analyze|Analyze      Explore disk usage"
+    "status|Status       Monitor system health"
+    "purge|Purge        Remove project build artifacts"
+)
+
+banner() {
+    printf '%s' "$PURPLE$BOLD"
+    cat << 'EOF'
+         _       _ _
+   _ __ (_)_  __(_) |_
+  | '_ \| \ \/ /| | __|
+  | | | | |>  < | | |_
+  |_| |_|_/_/\_\|_|\__|
+EOF
+    printf '%s  %s%s\n' "$NC$GRAY" "$TAGLINE" "$NC"
+}
+
+usage() {
+    banner
+    cat << EOF
+
+Usage: nixit [command] [options]
+
+Commands:
+  clean        Free up disk space (package caches, app caches, logs, Trash...)
+  uninstall    Remove packages/Flatpaks and their leftover folders
+  optimize     Refresh system caches and run maintenance tasks
+  analyze      Explore disk usage interactively         (nixit analyze [path])
+  status       Live system health dashboard             (nixit status [--json])
+  purge        Remove build artifacts from your projects
+  update       Pull the latest nixit and rebuild
+  version      Show version
+  help         Show this help
+
+Most commands take --dry-run to preview without changing anything.
+Run 'nixit <command> --help' for details. With no command, nixit opens a menu.
+EOF
+}
+
+go_binary() { # name -> path of the built Go helper, building it if needed
+    local bin="$NIXIT_ROOT/bin/$1-go"
+    if [[ ! -x "$bin" ]]; then
+        have go || die "The $1 tool is not built and Go is not installed. Run: sudo pacman -S go && make -C '$NIXIT_ROOT' build"
+        info "Building $1 (first run)..."
+        (cd "$NIXIT_ROOT" && go build -ldflags='-s -w' -o "$bin" "./cmd/$1") || die "Build failed."
+    fi
+    printf '%s' "$bin"
+}
+
+run_command() {
+    local cmd="$1"
+    shift
+    case "$cmd" in
+        clean | uninstall | optimize | purge) "$NIXIT_ROOT/bin/$cmd.sh" "$@" ;;
+        analyze | status)
+            local bin
+            bin=$(go_binary "$cmd") || return 1
+            "$bin" "$@"
+            ;;
+        update) update_self ;;
+        version | --version | -V) printf 'nixit %s\n' "$VERSION" ;;
+        help | --help | -h) usage ;;
+        *)
+            err "Unknown command: $cmd"
+            printf "Run 'nixit help' for usage.\n" >&2
+            return 1
+            ;;
+    esac
+}
+
+update_self() {
+    [[ -d "$NIXIT_ROOT/.git" ]] || die "nixit was not installed from git; reinstall it to update."
+    info "Pulling the latest nixit..."
+    git -C "$NIXIT_ROOT" pull --ff-only || die "git pull failed."
+    info "Rebuilding..."
+    make -C "$NIXIT_ROOT" build > /dev/null || die "Build failed."
+    ok "nixit is up to date: $(git -C "$NIXIT_ROOT" log -1 --format='%h %s')"
+}
+
+# ── Interactive menu ──────────────────────────────────────────────────────────
+read_key() {
+    local key rest
+    IFS= read -rsn1 key < /dev/tty || return 1
+    if [[ "$key" == $'\033' ]]; then
+        IFS= read -rsn2 -t 0.05 rest < /dev/tty || true
+        case "$rest" in
+            '[A') echo UP ;;
+            '[B') echo DOWN ;;
+            *) echo ESC ;;
+        esac
+        return
+    fi
+    case "$key" in
+        '') echo ENTER ;;
+        k | K) echo UP ;;
+        j | J) echo DOWN ;;
+        q | Q) echo QUIT ;;
+        [1-9]) echo "NUM:$key" ;;
+        *) echo OTHER ;;
+    esac
+}
+
+draw_menu() {
+    local selected="$1" i label
+    printf '\033[H\033[2J'
+    printf '\n'
+    banner
+    printf '\n'
+    for i in "${!MENU_ITEMS[@]}"; do
+        label="${MENU_ITEMS[$i]#*|}"
+        if ((i == selected)); then
+            printf '  %s➤ %d. %s%s\n' "$PURPLE$BOLD" "$((i + 1))" "$label" "$NC"
+        else
+            printf '    %d. %s\n' "$((i + 1))" "$label"
+        fi
+    done
+    printf '\n  %s↑↓/jk move · Enter select · 1-%d jump · Q quit%s\n' "$GRAY" "${#MENU_ITEMS[@]}" "$NC"
+}
+
+interactive_menu() {
+    local selected=0 key cmd
+    trap 'printf "\033[?25h"; exit 0' INT TERM
+    while true; do
+        printf '\033[?25l'
+        draw_menu "$selected"
+        key=$(read_key) || break
+        case "$key" in
+            UP) ((selected > 0)) && selected=$((selected - 1)) ;;
+            DOWN) ((selected < ${#MENU_ITEMS[@]} - 1)) && selected=$((selected + 1)) ;;
+            NUM:*)
+                local n="${key#NUM:}"
+                if ((n >= 1 && n <= ${#MENU_ITEMS[@]})); then
+                    selected=$((n - 1))
+                    key=ENTER
+                fi
+                ;;
+            QUIT | ESC) break ;;
+        esac
+        if [[ "$key" == ENTER ]]; then
+            cmd="${MENU_ITEMS[$selected]%%|*}"
+            printf '\033[?25h\033[H\033[2J'
+            run_command "$cmd"
+            case "$cmd" in
+                analyze | status) ;; # full-screen tools return straight to the menu
+                *) pause_for_key ;;
+            esac
+        fi
+    done
+    printf '\033[?25h\033[H\033[2J'
+}
+
+if (($# == 0)); then
+    if [[ -t 0 && -t 1 ]]; then
+        interactive_menu
+    else
+        usage
+    fi
+    exit 0
+fi
+
+run_command "$@"

@@ -1,7 +1,7 @@
 // Package main: status preferences store.
 //
 // Persisted preferences live in a tiny `key=value` file (one pair per line) at
-// ~/.config/mole/status_prefs. This file replaces the previous single-value
+// ~/.config/nixit/status_prefs. This file replaces the previous single-value
 // implementation, which compared the whole file against one exact string and so
 // could only ever hold a single preference. The map-based store below lets any
 // number of preferences coexist: writing one key preserves all the others.
@@ -25,7 +25,7 @@ func getConfigPath() string {
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "mole", "status_prefs")
+	return filepath.Join(home, ".config", "nixit", "status_prefs")
 }
 
 // loadPrefs reads the preferences file into a map. A missing or unreadable file

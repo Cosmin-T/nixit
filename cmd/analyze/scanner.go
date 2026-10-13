@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -24,8 +24,10 @@ import (
 	"unicode"
 )
 
+// spotlightQueryRunner is the macOS Spotlight hook. Linux has no equivalent
+// metadata index, so the large-file list always comes from the directory walk.
 var spotlightQueryRunner = func(ctx context.Context, root, query string) ([]byte, error) {
-	return exec.CommandContext(ctx, "mdfind", "-onlyin", root, query).Output()
+	return nil, errors.ErrUnsupported
 }
 
 // scanFailures retains only the first failure, even for a large unreadable tree,
@@ -1014,9 +1016,9 @@ func getDirectorySizeFromDuWithExcludeAndIgnores(ctx context.Context, path strin
 
 		args := []string{"-skPx"}
 		for _, ignoreName := range ignoreNames {
-			args = append(args, "-I", ignoreName)
+			args = append(args, "--exclude="+ignoreName)
 		}
-		args = append(args, target)
+		args = append(args, "--", target)
 		cmd := exec.CommandContext(ctx, "du", args...)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout
@@ -1246,7 +1248,7 @@ func countableFileSize(info fs.FileInfo, seen *sync.Map) (int64, bool) {
 	if !ok || stat.Nlink <= 1 {
 		return size, false
 	}
-	key := [2]uint64{uint64(uint32(stat.Dev)), stat.Ino}
+	key := [2]uint64{stat.Dev, stat.Ino}
 	if _, loaded := seen.LoadOrStore(key, struct{}{}); loaded {
 		return 0, true
 	}
@@ -1271,5 +1273,5 @@ func getLastAccessTimeFromInfo(info fs.FileInfo) time.Time {
 	if !ok {
 		return time.Time{}
 	}
-	return time.Unix(stat.Atimespec.Sec, stat.Atimespec.Nsec)
+	return time.Unix(stat.Atim.Sec, stat.Atim.Nsec)
 }

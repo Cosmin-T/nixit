@@ -368,9 +368,9 @@ func TestCorrectAPFSDiskUsageReportsFinderPurgeable(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("APFS Finder corrections are macOS-only")
 	}
-	// scripts/test.sh exports MOLE_TEST_NO_AUTH=1, which skips the Finder tier.
-	t.Setenv("MOLE_TEST_MODE", "")
-	t.Setenv("MOLE_TEST_NO_AUTH", "")
+	// scripts/test.sh exports NIXIT_TEST_NO_AUTH=1, which skips the Finder tier.
+	t.Setenv("NIXIT_TEST_MODE", "")
+	t.Setenv("NIXIT_TEST_NO_AUTH", "")
 
 	origRunCmd := runCmd
 	origCommandExists := commandExists
@@ -413,9 +413,9 @@ func TestCorrectAPFSDiskUsageClampsPurgeableToZero(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("APFS Finder corrections are macOS-only")
 	}
-	// scripts/test.sh exports MOLE_TEST_NO_AUTH=1, which skips the Finder tier.
-	t.Setenv("MOLE_TEST_MODE", "")
-	t.Setenv("MOLE_TEST_NO_AUTH", "")
+	// scripts/test.sh exports NIXIT_TEST_NO_AUTH=1, which skips the Finder tier.
+	t.Setenv("NIXIT_TEST_MODE", "")
+	t.Setenv("NIXIT_TEST_NO_AUTH", "")
 
 	origRunCmd := runCmd
 	origCommandExists := commandExists
@@ -447,10 +447,10 @@ func TestCorrectAPFSDiskUsageClampsPurgeableToZero(t *testing.T) {
 }
 
 func TestCorrectAPFSDiskUsageSkipsFinderUnderTestMode(t *testing.T) {
-	for _, env := range []string{"MOLE_TEST_MODE", "MOLE_TEST_NO_AUTH"} {
+	for _, env := range []string{"NIXIT_TEST_MODE", "NIXIT_TEST_NO_AUTH"} {
 		t.Run(env, func(t *testing.T) {
-			t.Setenv("MOLE_TEST_MODE", "")
-			t.Setenv("MOLE_TEST_NO_AUTH", "")
+			t.Setenv("NIXIT_TEST_MODE", "")
+			t.Setenv("NIXIT_TEST_NO_AUTH", "")
 			t.Setenv(env, "1")
 
 			origRunCmd := runCmd

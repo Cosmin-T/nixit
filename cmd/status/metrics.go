@@ -426,7 +426,7 @@ func (c *Collector) collectFull() (MetricsSnapshot, error) {
 	// Sample CPU first, before the concurrent collectors below spawn their
 	// subprocesses (system_profiler, df, ps, ...). The usage window is only
 	// 100ms, so measuring while our own collection burst runs inflates the
-	// reading with Mole's own load (#1237).
+	// reading with nixit's own load (#1237).
 	var cpuErr error
 	collected.cpuStats, cpuErr = collectCPUFunc()
 	if cpuErr == nil {

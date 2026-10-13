@@ -25,6 +25,9 @@ var skipDiskMounts = map[string]bool{
 	"/System/Volumes/Hardware": true,
 	"/System/Volumes/Data":     true,
 	"/dev":                     true,
+	"/boot":                    true,
+	"/boot/efi":                true,
+	"/efi":                     true,
 }
 
 var skipDiskFSTypes = map[string]bool{
@@ -395,10 +398,10 @@ func getAPFSContainerFreeBytes(mountpoint string) (uint64, error) {
 	return extractPlistUint(out, "APFSContainerFree")
 }
 
-// authPromptsDisabled mirrors the shell test-mode guard: MOLE_TEST_MODE or
-// MOLE_TEST_NO_AUTH set to 1 means nothing may raise an authorization prompt.
+// authPromptsDisabled mirrors the shell test-mode guard: NIXIT_TEST_MODE or
+// NIXIT_TEST_NO_AUTH set to 1 means nothing may raise an authorization prompt.
 func authPromptsDisabled() bool {
-	return os.Getenv("MOLE_TEST_MODE") == "1" || os.Getenv("MOLE_TEST_NO_AUTH") == "1"
+	return os.Getenv("NIXIT_TEST_MODE") == "1" || os.Getenv("NIXIT_TEST_NO_AUTH") == "1"
 }
 
 // getFinderStartupDiskFreeBytes queries Finder via osascript for the startup
@@ -562,6 +565,9 @@ func scanTrashSize() (uint64, bool) {
 	defer cancel()
 	var total uint64
 	trashPath := filepath.Join(home, ".Trash")
+	if runtime.GOOS == "linux" {
+		trashPath = linuxTrashPath(home)
+	}
 	_ = filepath.WalkDir(trashPath, func(_ string, d fs.DirEntry, err error) error {
 		if ctx.Err() != nil {
 			return fs.SkipAll

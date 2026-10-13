@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/tw93/mole/internal/units"
+	"github.com/Cosmin-T/nixit/internal/units"
 )
 
 var (
@@ -47,66 +48,66 @@ const (
 	placeholderValue = "--"
 )
 
-// Mole body frames (facing right).
-var moleBody = [][]string{
+// Sweeper bot frames (facing right, dust trailing behind).
+var sweeperBody = [][]string{
 	{
-		`     /\_/\`,
-		` ___/ o o \`,
-		`/___   =-= /`,
-		`\____)-m-m)`,
+		`     ___`,
+		`    [o_o]`,
+		` ~ /|___|\`,
+		`    o   o`,
 	},
 	{
-		`     /\_/\`,
-		` ___/ o o \`,
-		`/___   =-= /`,
-		`\____)mm__)`,
+		`     ___`,
+		`    [o_o]`,
+		`  ~/|___|\`,
+		`    O   O`,
 	},
 	{
-		`     /\_/\`,
-		` ___/ · · \`,
-		`/___   =-= /`,
-		`\___)-m__m)`,
+		`     ___`,
+		`    [-_-]`,
+		`. ~/|___|\`,
+		`    o   o`,
 	},
 	{
-		`     /\_/\`,
-		` ___/ o o \`,
-		`/___   =-= /`,
-		`\____)-mm-)`,
-	},
-}
-
-// Mirror mole body frames (facing left).
-var moleBodyMirror = [][]string{
-	{
-		`    /\_/\`,
-		`   / o o \___`,
-		`  \ =-=   ___\`,
-		`  (m-m-(____/`,
-	},
-	{
-		`    /\_/\`,
-		`   / o o \___`,
-		`  \ =-=   ___\`,
-		`  (__mm(____/`,
-	},
-	{
-		`    /\_/\`,
-		`   / · · \___`,
-		`  \ =-=   ___\`,
-		`  (m__m-(___/`,
-	},
-	{
-		`    /\_/\`,
-		`   / o o \___`,
-		`  \ =-=   ___\`,
-		`  (-mm-(____/`,
+		`     ___`,
+		`    [o_o]`,
+		` .~/|___|\`,
+		`    O   O`,
 	},
 }
 
-// getMoleFrame renders the animated mole.
-func getMoleFrame(animFrame int, termWidth int) string {
-	moleWidth := 15
-	maxPos := max(termWidth-moleWidth, 0)
+// Mirrored sweeper bot frames (facing left).
+var sweeperBodyMirror = [][]string{
+	{
+		`    ___`,
+		`   [o_o]`,
+		`  /|___|\ ~`,
+		`   o   o`,
+	},
+	{
+		`    ___`,
+		`   [o_o]`,
+		`  /|___|\~`,
+		`   O   O`,
+	},
+	{
+		`    ___`,
+		`   [-_-]`,
+		`  /|___|\~ .`,
+		`   o   o`,
+	},
+	{
+		`    ___`,
+		`   [o_o]`,
+		`  /|___|\~.`,
+		`   O   O`,
+	},
+}
+
+// getMascotFrame renders the animated sweeper bot.
+func getMascotFrame(animFrame int, termWidth int) string {
+	mascotWidth := 15
+	maxPos := max(termWidth-mascotWidth, 0)
 
 	cycleLength := maxPos * 2
 	if cycleLength == 0 {
@@ -121,9 +122,9 @@ func getMoleFrame(animFrame int, termWidth int) string {
 	// Use mirror frames when moving left
 	var frames [][]string
 	if movingLeft {
-		frames = moleBodyMirror
+		frames = sweeperBodyMirror
 	} else {
-		frames = moleBody
+		frames = sweeperBody
 	}
 
 	bodyIdx := animFrame % len(frames)
@@ -258,22 +259,22 @@ func renderHeader(m MetricsSnapshot, errMsg string, animFrame int, termWidth int
 		}
 	}
 
-	// Show cat unless hidden - render mole centered below header
-	var mole string
+	// Show cat unless hidden - render mascot centered below header
+	var mascot string
 	if !catHidden {
-		mole = getMoleFrame(animFrame, termWidth)
+		mascot = getMascotFrame(animFrame, termWidth)
 	}
 
 	if errMsg != "" {
-		if mole == "" {
+		if mascot == "" {
 			return lipgloss.JoinVertical(lipgloss.Left, headerLine, "", dangerStyle.Render("ERROR: "+errMsg)), ""
 		}
-		return lipgloss.JoinVertical(lipgloss.Left, headerLine, "", mole, dangerStyle.Render("ERROR: "+errMsg)), ""
+		return lipgloss.JoinVertical(lipgloss.Left, headerLine, "", mascot, dangerStyle.Render("ERROR: "+errMsg)), ""
 	}
-	if mole == "" {
+	if mascot == "" {
 		return headerLine, ""
 	}
-	return headerLine, mole
+	return headerLine, mascot
 }
 
 func getScoreStyle(score int) lipgloss.Style {
@@ -498,6 +499,9 @@ func renderDiskCard(disks []DiskStatus, io DiskIOStatus, _ uint64, _ bool) cardD
 			}
 			for i, d := range list {
 				label := diskLabel(prefix, i, len(list))
+				if runtime.GOOS == "linux" {
+					label = linuxDiskLabel(d.Mount)
+				}
 				lines = append(lines, formatDiskLine(label, d))
 			}
 		}
@@ -699,11 +703,15 @@ func buildCards(m MetricsSnapshot, width int, cpuCores int, batteryProbed bool) 
 			processCard.lines = []string{warnStyle.Render("UNKNOWN · process sample unavailable")}
 		}
 	}
+	powerCard := renderBatteryCard(m.Batteries, m.Thermal, batteryProbed)
+	if runtime.GOOS == "linux" && len(m.Batteries) == 0 && hasGPUData(m.GPU) {
+		powerCard = renderGPUCard(m.GPU, m.Thermal)
+	}
 	cards := []cardData{
 		renderCPUCard(m.CPU, m.Thermal, cpuCores),
 		renderMemoryCard(m.Memory, width),
 		renderDiskCard(m.Disks, m.DiskIO, m.TrashSize, m.TrashApprox),
-		renderBatteryCard(m.Batteries, m.Thermal, batteryProbed),
+		powerCard,
 		processCard,
 		renderNetworkCard(m.Network, m.NetworkHistory, m.Proxy, width),
 	}
@@ -725,7 +733,7 @@ func renderNetworkCard(netStats []NetworkStatus, history NetworkHistory, proxy P
 	var primaryIP string
 
 	for _, n := range netStats {
-		if primaryIP == "" && n.IP != "" && n.Name == "en0" {
+		if primaryIP == "" && n.IP != "" && (n.Name == "en0" || isPrimaryLinuxInterface(n.Name)) {
 			primaryIP = n.IP
 		}
 	}

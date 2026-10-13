@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -22,10 +22,10 @@ var (
 	jsonMode = flag.Bool("json", false, "output analysis as JSON instead of TUI")
 )
 
-// usageText is the help every other Mole subcommand prints by hand. The Go flag
+// usageText is the help every other nixit subcommand prints by hand. The Go flag
 // package would otherwise render "Usage of /usr/local/bin/analyze-go:", naming a
 // bundled binary the user never typed, so the text is written out here instead.
-const usageText = `Usage: mo analyze [OPTIONS] [PATH]
+const usageText = `Usage: nixit analyze [OPTIONS] [PATH]
 
 Explore disk usage. Without PATH, scans a machine-wide overview.
 
@@ -34,17 +34,17 @@ Options:
   -h, --help      Show this help message
 
 Examples:
-  mo analyze                 Machine-wide overview
-  mo analyze ~/Library       Scan one directory
-  mo analyze --json /Volumes Machine-readable output
+  nixit analyze                 Machine-wide overview
+  nixit analyze ~/.cache      Scan one directory
+  nixit analyze --json /mnt   Machine-readable output
 `
 
-// parseArgs applies Mole's CLI conventions to the flag package: help goes to
+// parseArgs applies nixit's CLI conventions to the flag package: help goes to
 // stdout and exits 0, and an unknown flag goes to stderr and exits 1 the way
 // every bash subcommand does, rather than the flag package's stderr-and-2.
 // It returns the exit code and whether main should keep running.
 func parseArgs(args []string, stdout, stderr io.Writer) (int, bool) {
-	flag.CommandLine.Init("mo analyze", flag.ContinueOnError)
+	flag.CommandLine.Init("nixit analyze", flag.ContinueOnError)
 	// Parse must not print: this function decides which stream each message
 	// belongs on, and the default handler writes usage to stderr for both.
 	flag.CommandLine.SetOutput(io.Discard)
@@ -57,7 +57,7 @@ func parseArgs(args []string, stdout, stderr io.Writer) (int, bool) {
 		return 0, false
 	case err != nil:
 		_, _ = fmt.Fprintln(stderr, err)
-		_, _ = fmt.Fprintln(stderr, "Use 'mo analyze --help' for usage information")
+		_, _ = fmt.Fprintln(stderr, "Use 'nixit analyze --help' for usage information")
 		return 1, false
 	}
 	return 0, true
@@ -187,17 +187,8 @@ func createOverviewEntriesWithInsights(insightEntries []dirEntry) []dirEntry {
 	home := os.Getenv("HOME")
 	entries := []dirEntry{}
 
-	// Separate Home and ~/Library to avoid double counting.
 	if home != "" {
 		entries = append(entries, dirEntry{Name: "Home", Path: home, IsDir: true, Size: -1})
-
-		userLibrary := filepath.Join(home, "Library")
-		if _, err := os.Stat(userLibrary); err == nil {
-			// Renamed from "App Library" to "User Library" so it parallels
-			// "System Library" (`/Library`) and is not confused with
-			// `/Applications`. Path unchanged.
-			entries = append(entries, dirEntry{Name: "User Library", Path: userLibrary, IsDir: true, Size: -1})
-		}
 	}
 
 	entries = append(entries, systemOverviewRoots()...)
@@ -210,8 +201,9 @@ func createOverviewEntriesWithInsights(insightEntries []dirEntry) []dirEntry {
 
 func systemOverviewRoots() []dirEntry {
 	return []dirEntry{
-		{Name: "Applications", Path: "/Applications", IsDir: true, Size: -1},
-		{Name: "System Library", Path: "/Library", IsDir: true, Size: -1},
+		{Name: "System Programs", Path: "/usr", IsDir: true, Size: -1},
+		{Name: "Optional Software", Path: "/opt", IsDir: true, Size: -1},
+		{Name: "Variable Data", Path: "/var", IsDir: true, Size: -1},
 	}
 }
 
@@ -247,21 +239,28 @@ func safeOpen(path string, reveal bool) error {
 	if err := validatePath(path); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), openCommandTimeout)
-	defer cancel()
-	args := []string{path}
 	if reveal {
-		args = []string{"-R", path}
+		// Show the containing folder in the file manager.
+		path = filepath.Dir(path)
 	}
-	return exec.CommandContext(ctx, "open", args...).Run()
+	return startDetached("xdg-open", path)
 }
 
-// safePreview opens the file with the default macOS application.
+// safePreview opens the file with the default desktop application.
 func safePreview(path string) error {
 	if err := validatePath(path); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), openCommandTimeout)
-	defer cancel()
-	return exec.CommandContext(ctx, "open", path).Run()
+	return startDetached("xdg-open", path)
+}
+
+// startDetached launches a desktop opener without tying the launched app's
+// lifetime to a timeout, then reaps it in the background.
+func startDetached(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
 }

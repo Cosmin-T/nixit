@@ -1,74 +1,40 @@
-# Makefile for Mole
+# Makefile for nixit
 
-.PHONY: all build clean check format test test-go verify release release-amd64 release-arm64 mod-download
+.PHONY: all build install uninstall check test test-go test-shell clean
 
-# Output directory
 BIN_DIR := bin
-
-# Go toolchain
 GO ?= go
-GO_DOWNLOAD_RETRIES ?= 3
-
-# Binaries
-ANALYZE := analyze
-STATUS := status
-
-# Source directories
-ANALYZE_SRC := ./cmd/analyze
-STATUS_SRC := ./cmd/status
-
-# Build flags
 LDFLAGS := -s -w
-RELEASE_GO_ENV := CGO_ENABLED=0
+PREFIX ?= $(HOME)/.local
 
 all: build
 
-# Download modules with retries to mitigate transient proxy/network EOF errors.
-mod-download:
-	@attempt=1; \
-	while [ $$attempt -le $(GO_DOWNLOAD_RETRIES) ]; do \
-		echo "Downloading Go modules ($$attempt/$(GO_DOWNLOAD_RETRIES))..."; \
-		if $(GO) mod download; then \
-			exit 0; \
-		fi; \
-		sleep $$((attempt * 2)); \
-		attempt=$$((attempt + 1)); \
-	done; \
-	echo "Go module download failed after $(GO_DOWNLOAD_RETRIES) attempts"; \
-	exit 1
+# Build the Go helpers (disk analyzer and status dashboard).
+build:
+	$(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/analyze-go ./cmd/analyze
+	$(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/status-go ./cmd/status
 
-# Local build (current architecture)
-build: mod-download
-	@echo "Building for local architecture..."
-	$(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(ANALYZE)-go $(ANALYZE_SRC)
-	$(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(STATUS)-go $(STATUS_SRC)
+# Link the nixit command into $(PREFIX)/bin (default ~/.local/bin).
+install: build
+	mkdir -p $(PREFIX)/bin
+	ln -sf $(CURDIR)/nixit $(PREFIX)/bin/nixit
+	@echo "Installed: $(PREFIX)/bin/nixit -> $(CURDIR)/nixit"
+
+uninstall:
+	rm -f $(PREFIX)/bin/nixit
 
 check:
-	./scripts/check.sh --no-format
+	bash -n nixit lib/*.sh bin/*.sh
+	@if command -v shellcheck >/dev/null; then shellcheck -x -e SC1091 nixit lib/*.sh bin/*.sh; else echo "shellcheck not installed; skipped"; fi
+	$(GO) vet ./...
 
-format:
-	./scripts/check.sh --format
-
-test:
-	MOLE_TEST_NO_AUTH=1 ./scripts/test.sh
+test: test-go test-shell
 
 test-go:
 	$(GO) test ./...
 
-verify: check test-go
-
-# Release build targets. Keep these pure-Go so the macOS SDK on the
-# release runner cannot raise the Mach-O minimum OS version via cgo.
-release-amd64: mod-download
-	@echo "Building release binaries (amd64)..."
-	$(RELEASE_GO_ENV) GOOS=darwin GOARCH=amd64 $(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(ANALYZE)-darwin-amd64 $(ANALYZE_SRC)
-	$(RELEASE_GO_ENV) GOOS=darwin GOARCH=amd64 $(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(STATUS)-darwin-amd64 $(STATUS_SRC)
-
-release-arm64: mod-download
-	@echo "Building release binaries (arm64)..."
-	$(RELEASE_GO_ENV) GOOS=darwin GOARCH=arm64 $(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(ANALYZE)-darwin-arm64 $(ANALYZE_SRC)
-	$(RELEASE_GO_ENV) GOOS=darwin GOARCH=arm64 $(GO) build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(STATUS)-darwin-arm64 $(STATUS_SRC)
+test-shell:
+	bash tests/run.sh
 
 clean:
-	@echo "Cleaning binaries..."
-	rm -f $(BIN_DIR)/$(ANALYZE)-* $(BIN_DIR)/$(STATUS)-* $(BIN_DIR)/$(ANALYZE)-go $(BIN_DIR)/$(STATUS)-go
+	rm -f $(BIN_DIR)/analyze-go $(BIN_DIR)/status-go

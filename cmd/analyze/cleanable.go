@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -14,13 +14,13 @@ const (
 	cacheDirTagSignature = "Signature: 8a477f597d28d172789f06886806bc55"
 )
 
-// isCleanableDir marks paths safe to delete manually (not handled by mo clean).
+// isCleanableDir marks paths safe to delete manually (not handled by nixit clean).
 func isCleanableDir(path string) bool {
 	if path == "" {
 		return false
 	}
 
-	// Exclude paths mo clean already handles.
+	// Exclude paths nixit clean already handles.
 	if isHandledByMoClean(path) {
 		return false
 	}
@@ -63,7 +63,7 @@ func hasValidCacheDirTag(path string) bool {
 	return string(buf) == cacheDirTagSignature
 }
 
-// isHandledByMoClean checks if a path is cleaned by mo clean.
+// isHandledByMoClean checks if a path is cleaned by nixit clean.
 func isHandledByMoClean(path string) bool {
 	for _, fragment := range moCleanHandledPathFragments {
 		if strings.Contains(path, fragment) {
@@ -75,11 +75,11 @@ func isHandledByMoClean(path string) bool {
 }
 
 var moCleanHandledPathFragments = []string{
-	"/Library/Caches/",
-	"/Library/Logs/",
-	"/Library/Saved Application State/",
-	"/.Trash/",
-	"/Library/DiagnosticReports/",
+	"/.cache/",
+	"/.local/share/Trash/",
+	"/var/cache/pacman/pkg/",
+	"/var/log/journal/",
+	"/var/lib/systemd/coredump/",
 }
 
 // Project dependency and build directories.

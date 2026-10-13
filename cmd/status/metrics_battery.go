@@ -344,6 +344,9 @@ func getSystemPowerOutput() string {
 }
 
 func collectThermal() ThermalStatus {
+	if runtime.GOOS == "linux" {
+		return collectThermalLinux()
+	}
 	if runtime.GOOS != "darwin" {
 		return ThermalStatus{}
 	}

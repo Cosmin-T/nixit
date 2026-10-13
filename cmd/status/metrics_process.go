@@ -22,13 +22,18 @@ var collectProcessesFunc = collectProcesses
 const zombieParentLimit = 3
 
 func collectProcesses() (processSample, error) {
-	if runtime.GOOS != "darwin" {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		return processSample{}, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	out, err := runCmd(ctx, "ps", "-Aceo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r")
+	psArgs := []string{"-Aceo", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "-r"}
+	if runtime.GOOS == "linux" {
+		// procps-ng: -c changes the output format and -r means "running only".
+		psArgs = []string{"-Ae", "-o", "pid=,ppid=,state=,pcpu=,pmem=,rss=,comm=", "--sort=-pcpu"}
+	}
+	out, err := runCmd(ctx, "ps", psArgs...)
 	if err == nil {
 		if procs, parseErr := parseProcessOutputStrict(out); parseErr == nil {
 			return processSample{processes: procs, parentsAvailable: true}, nil

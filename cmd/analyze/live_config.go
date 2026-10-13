@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build linux
 
 package main
 
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const liveSortModeEnv = "MOLE_ANALYZE_LIVE_SORT"
+const liveSortModeEnv = "NIXIT_ANALYZE_LIVE_SORT"
 
 func liveScanSortModeFromEnv() liveSortMode {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(liveSortModeEnv))) {

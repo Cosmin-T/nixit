@@ -51,6 +51,11 @@ func (c *Collector) collectGPU(now time.Time) ([]GPUStatus, error) {
 	defer cancel()
 
 	if !commandExists("nvidia-smi") {
+		if runtime.GOOS == "linux" {
+			if gpus := readLinuxDRMGPUs(); len(gpus) > 0 {
+				return gpus, nil
+			}
+		}
 		return []GPUStatus{{
 			Name: "No GPU metrics available",
 			Note: "Install nvidia-smi or use platform-specific metrics",
