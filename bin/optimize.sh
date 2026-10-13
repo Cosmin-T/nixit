@@ -117,7 +117,7 @@ if [[ "$ASSUME_YES" == "1" ]]; then
     done
 else
     picked=$(printf '%s\n' "${lines[@]}" | pick_items "Optimize" \
-        "Tab toggle · Ctrl-A all · Ctrl-D none · Enter run · Esc cancel" 1 "$unselected")
+        "Tab toggle · Alt-A all · Alt-D none · Enter run · Esc cancel" 1 "$unselected")
     [[ -z "$picked" ]] && {
         dim "Nothing selected."
         exit 0

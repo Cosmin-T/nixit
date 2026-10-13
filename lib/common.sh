@@ -273,7 +273,7 @@ pick_items() {
         --prompt="$prompt > " --header="$header"
         --header-first --info=inline-right
         --color='pointer:magenta,marker:green,header:gray,prompt:magenta'
-        --bind='ctrl-a:select-all,ctrl-d:deselect-all'
+        --bind='alt-a:select-all,alt-d:deselect-all'
     )
     if [[ "$select_all" == "1" ]]; then
         local load='select-all' pos

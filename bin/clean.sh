@@ -254,7 +254,7 @@ if [[ "$ASSUME_YES" == "1" ]]; then
     done
 else
     picked=$(printf '%s\n' "${lines[@]}" | NO_COLOR='' pick_items "Clean" \
-        "Found $(human_size "$total") · Tab toggle · Ctrl-A all · Ctrl-D none · Enter continue · Esc cancel" 1 "$unselected")
+        "Found $(human_size "$total") · Tab toggle · Alt-A all · Alt-D none · Enter continue · Esc cancel" 1 "$unselected")
     [[ -z "$picked" ]] && {
         dim "Nothing selected."
         exit 0
