@@ -2,13 +2,20 @@
 
 **Clean and tune your Arch system from the terminal.**
 
-nixit is a Linux fork of [Mole](https://github.com/tw93/Mole), the macOS
-cleaner by tw93, rebuilt for Arch Linux and CachyOS. It frees disk space,
+> **nixit is built on [Mole](https://github.com/tw93/Mole), created by
+> [tw93](https://github.com/tw93).** Mole is a terminal tool that deep-cleans,
+> uninstalls apps, optimizes, analyzes disk usage and monitors macOS. nixit
+> started as a fork of it, and its disk analyzer and status dashboard are
+> Mole's code ported to Linux. All credit for the original design and those
+> tools goes to tw93 and Mole's contributors. If you use a Mac, use Mole:
+> [github.com/tw93/Mole](https://github.com/tw93/Mole) · [mole.fit](https://mole.fit).
+>
+> nixit is an independent project and is not affiliated with or endorsed by
+> Mole or its authors. "Mole" and its logo are trademarks of the Mole project.
+
+nixit brings Mole's idea to Arch Linux and CachyOS. It frees disk space,
 removes apps with their leftovers, runs routine maintenance, shows what is
 eating your disk and gives you a live system dashboard, all from one menu.
-
-nixit is an independent project. It is not affiliated with or endorsed by Mole
-or its authors.
 
 ```
          _       _ _
@@ -28,16 +35,29 @@ or its authors.
 
 ## Install
 
-Needs `bash`, `fzf`, `pacman-contrib` (for `paccache`) and `go` to build.
+From the AUR, with yay or paru:
 
 ```sh
-sudo pacman -S --needed fzf pacman-contrib go
+yay -S nixit-git
+# or
+paru -S nixit-git
+```
+
+Update with your AUR helper as usual (`yay -Syu` / `paru -Syu`).
+
+### From source
+
+Needs `bash`, `fzf`, `pacman-contrib` (for `paccache`), `glib2` (for `gio`) and
+`go` to build.
+
+```sh
+sudo pacman -S --needed fzf pacman-contrib glib2 go
 git clone https://github.com/Cosmin-T/nixit.git ~/Projects/nixit
 cd ~/Projects/nixit
 make install        # builds the Go tools, links ~/.local/bin/nixit
 ```
 
-Update later with `nixit update`. Remove with `make uninstall`.
+Update a source install with `nixit update`. Remove it with `make uninstall`.
 
 ## Commands
 
@@ -78,11 +98,23 @@ make test    # Go tests + shell tests
 make check   # syntax check, shellcheck if installed, go vet
 ```
 
-## License and credits
+## Credits
+
+- **[Mole](https://github.com/tw93/Mole)** by **[tw93](https://github.com/tw93)**
+  and its [contributors](https://github.com/tw93/Mole/graphs/contributors) is
+  the project nixit is forked from. Mole's full git history is kept in this
+  repository, so every original commit still carries its author.
+- What came from Mole: the overall design (one menu for clean, uninstall,
+  optimize, analyze, status and purge), the disk analyzer (`cmd/analyze`) and
+  the status dashboard (`cmd/status`), ported here from macOS to Linux.
+- What is new in nixit: the Linux ports of those two tools, and the clean,
+  uninstall, optimize and purge commands, rewritten for pacman, the AUR helpers,
+  Flatpak and systemd. See [NOTICE](NOTICE) for the full list of changes.
+
+If nixit is useful to you, consider starring
+[Mole](https://github.com/tw93/Mole) too.
+
+## License
 
 nixit is licensed under the GNU General Public License v3.0, the same license
 as Mole. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-The disk analyzer and status dashboard are adapted from Mole's Go code; the
-shell commands were rewritten for Arch. Thanks to tw93 and the Mole
-contributors for the original project.

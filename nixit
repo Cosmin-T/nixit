@@ -59,9 +59,13 @@ Run 'nixit <command> --help' for details. With no command, nixit opens a menu.
 EOF
 }
 
+# installed_by_pacman -> 0 when nixit came from a package (AUR), not a git checkout.
+installed_by_pacman() { pacman -Qqo "$NIXIT_ROOT/nixit" > /dev/null 2>&1; }
+
 go_binary() { # name -> path of the built Go helper, building it if needed
     local bin="$NIXIT_ROOT/bin/$1-go"
     if [[ ! -x "$bin" ]]; then
+        installed_by_pacman && die "The $1 tool is missing from the nixit package. Reinstall it with your AUR helper."
         have go || die "The $1 tool is not built and Go is not installed. Run: sudo pacman -S go && make -C '$NIXIT_ROOT' build"
         info "Building $1 (first run)..."
         (cd "$NIXIT_ROOT" && go build -ldflags='-s -w' -o "$bin" "./cmd/$1") || die "Build failed."
@@ -91,6 +95,11 @@ run_command() {
 }
 
 update_self() {
+    if installed_by_pacman; then
+        info "nixit is installed as a package ($(pacman -Qqo "$NIXIT_ROOT/nixit")). Update it with your AUR helper:"
+        printf '    yay -Syu    or    paru -Syu\n'
+        return 0
+    fi
     [[ -d "$NIXIT_ROOT/.git" ]] || die "nixit was not installed from git; reinstall it to update."
     info "Pulling the latest nixit..."
     git -C "$NIXIT_ROOT" pull --ff-only || die "git pull failed."
