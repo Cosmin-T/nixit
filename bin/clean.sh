@@ -214,6 +214,13 @@ clean_flatpak() {
     flatpak uninstall --unused -y --noninteractive > /dev/null 2>&1 || true
 }
 
+# free_space -> available bytes summed over the filesystems that hold / and
+# $HOME, counting each filesystem once (on btrfs both are usually the same one).
+free_space() {
+    df --output=source,avail -B1 / "$HOME" 2> /dev/null |
+        awk 'NR>1 && !seen[$1]++ {s+=$2} END {print s+0}'
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 header "nixit clean$([[ "$NIXIT_DRY_RUN" == "1" ]] && printf ' (dry run)')"
 
@@ -286,7 +293,7 @@ if [[ "$needs_sudo" == "1" && "$NIXIT_DRY_RUN" != "1" ]]; then
     ensure_sudo "package cache, logs and orphaned packages" || die "Could not get administrator access."
 fi
 
-free_before=$(df --output=avail -B1 / "$HOME" 2> /dev/null | awk 'NR>1 {s+=$1} END {print s+0}')
+free_before=$(free_space)
 
 for id in "${selected[@]}"; do
     printf '%s➜%s %s\n' "$BLUE" "$NC" "${ITEM_LABEL[$id]}"
@@ -301,7 +308,7 @@ if [[ "$NIXIT_DRY_RUN" == "1" ]]; then
 fi
 
 sync
-free_after=$(df --output=avail -B1 / "$HOME" 2> /dev/null | awk 'NR>1 {s+=$1} END {print s+0}')
+free_after=$(free_space)
 freed=$((free_after - free_before))
 printf '\n'
 if ((freed > 0)); then
