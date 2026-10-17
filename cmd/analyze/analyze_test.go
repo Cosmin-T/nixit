@@ -3814,6 +3814,7 @@ func TestPartialNavigationRefreshRecoversCoverage(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	m := newModel(root, false)
+	defer m.cancelBackgroundCacheWrites(nil)
 	updated, _ := m.Update(runScanResultCmd(t, m.scanFreshCmd(root)))
 	m = updated.(model)
 	if m.scanState != scanPartial || len(m.entries) != 2 {
