@@ -140,6 +140,17 @@ while IFS=$'\t' read -r size age path; do
         "${path/#$HOME/\~}" "$GRAY" "$age" "$NC" "$recent")")
 done <<< "$found"
 
+if [[ "$NIXIT_DRY_RUN" == "1" ]]; then
+    # No picker in dry-run: this has to work without a TTY (CI, cron, scripts),
+    # and there's nothing to actually select since nothing gets removed anyway.
+    # Show everything found, same recency tagging the picker would've shown.
+    printf 'Would consider %d item(s), about %s:\n\n' "${#lines[@]}" "$(human_size "$total")"
+    printf '%s\n' "${lines[@]}" | cut -f2-
+    printf '\n'
+    ok "Dry run complete. About $(human_size "$total") could be freed."
+    exit 0
+fi
+
 picked=$(printf '%s\n' "${lines[@]}" | pick_items "Purge" \
     "Found $(human_size "$total") · Tab toggle · Alt-A all · Alt-D none · Enter continue · Esc cancel" 1 "$unselected")
 [[ -z "$picked" ]] && {
