@@ -13,7 +13,7 @@ ASSUME_YES=0
 for arg in "$@"; do
     case "$arg" in
         -n | --dry-run) NIXIT_DRY_RUN=1 ;;
-        -y | --yes) ASSUME_YES=1 ;;
+        -y | --yes) ASSUME_YES=$((ASSUME_YES + 1)) ;;
         -h | --help)
             cat << EOF
 Usage: nixit clean [--dry-run] [--yes]
@@ -21,8 +21,10 @@ Usage: nixit clean [--dry-run] [--yes]
 Scan for reclaimable space, choose what to remove, then remove it.
 
   -n, --dry-run   Show what would be removed without changing anything
-  -y, --yes       Clean every default-selected item without the picker or
-                  confirmation (orphaned packages are never included)
+  -y, --yes       Clean every default-selected item without the picker
+                  (orphaned packages are never included), but still ask
+                  to confirm before removing. Pass it twice (-y -y) to
+                  also skip that confirmation, for unattended runs.
   -h, --help      Show this help
 
 Never removed: anything listed in ~/.config/nixit/whitelist (one glob per line),
@@ -257,7 +259,7 @@ for id in "${ITEM_ORDER[@]}"; do
     lines+=("$(printf '%s\t%s%10s%s  %s%s%s' "$id" "$BOLD" "$shown" "$NC" "${ITEM_LABEL[$id]}" "$tag" "$note")")
 done
 
-if [[ "$ASSUME_YES" == "1" ]]; then
+if ((ASSUME_YES >= 1)); then
     selected=()
     for id in "${ITEM_ORDER[@]}"; do
         [[ "${ITEM_DEFAULT[$id]}" == "1" ]] && selected+=("$id")
@@ -285,13 +287,13 @@ for id in "${selected[@]}"; do
 done
 printf '\n'
 
-if [[ "$NIXIT_DRY_RUN" != "1" && "$ASSUME_YES" != "1" ]]; then
+if [[ "$NIXIT_DRY_RUN" != "1" ]] && ((ASSUME_YES < 2)); then
     confirm "Remove these ${#selected[@]} items and free about $(human_size "$selected_total")?" || {
         dim "Cancelled. Nothing was removed."
         exit 0
     }
-elif [[ "$NIXIT_DRY_RUN" != "1" && "$ASSUME_YES" == "1" ]]; then
-    printf '%s%s⚠ REMOVING FOR REAL — no confirmation (--yes): %d items, about %s%s\n\n' \
+elif [[ "$NIXIT_DRY_RUN" != "1" ]]; then
+    printf '%s%s⚠ REMOVING FOR REAL — no confirmation (-y -y): %d items, about %s%s\n\n' \
         "$RED" "$BOLD" "${#selected[@]}" "$(human_size "$selected_total")" "$NC"
 fi
 
