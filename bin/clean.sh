@@ -25,7 +25,10 @@ Scan for reclaimable space, choose what to remove, then remove it.
                   confirmation (orphaned packages are never included)
   -h, --help      Show this help
 
-Never removed: anything listed in ~/.config/nixit/whitelist (one glob per line).
+Never removed: anything listed in ~/.config/nixit/whitelist (one glob per line),
+and ~/.cache/yay, ~/.cache/paru, ~/.cache/nixit (nixit protects AUR helper
+build caches and its own cache from the general "App caches" item; yay/paru
+caches still show up as their own separate, opt-in items).
 EOF
             exit 0
             ;;
@@ -287,6 +290,9 @@ if [[ "$NIXIT_DRY_RUN" != "1" && "$ASSUME_YES" != "1" ]]; then
         dim "Cancelled. Nothing was removed."
         exit 0
     }
+elif [[ "$NIXIT_DRY_RUN" != "1" && "$ASSUME_YES" == "1" ]]; then
+    printf '%s%s⚠ REMOVING FOR REAL — no confirmation (--yes): %d items, about %s%s\n\n' \
+        "$RED" "$BOLD" "${#selected[@]}" "$(human_size "$selected_total")" "$NC"
 fi
 
 if [[ "$needs_sudo" == "1" && "$NIXIT_DRY_RUN" != "1" ]]; then
