@@ -83,7 +83,7 @@ run_command() {
             bin=$(go_binary "$cmd") || return 1
             "$bin" "$@"
             ;;
-        update) update_self ;;
+        update) update_self "$@" ;;
         version | --version | -V) printf 'nixit %s\n' "$VERSION" ;;
         help | --help | -h) usage ;;
         *)
@@ -95,6 +95,21 @@ run_command() {
 }
 
 update_self() {
+    for arg in "$@"; do
+        case "$arg" in
+            -h | --help)
+                cat << EOF
+Usage: nixit update
+
+Pull the latest nixit from git and rebuild it. No effect if nixit was
+installed as a package (use your AUR helper instead: yay -Syu / paru -Syu).
+EOF
+                return 0
+                ;;
+            *) die "Unknown option: $arg (see nixit update --help)" ;;
+        esac
+    done
+
     if installed_by_pacman; then
         info "nixit is installed as a package ($(pacman -Qqo "$NIXIT_ROOT/nixit")). Update it with your AUR helper:"
         printf '    yay -Syu    or    paru -Syu\n'
