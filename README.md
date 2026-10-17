@@ -35,7 +35,27 @@ eating your disk and gives you a live system dashboard, all from one menu.
 
 ## Install
 
-From the AUR, with yay or paru:
+From the nixit pacman repo (prebuilt binary, no AUR account/helper needed).
+Add to `/etc/pacman.conf`:
+
+```ini
+[nixit]
+Server = https://cosmin-t.github.io/nixit/x86_64
+```
+
+Then:
+
+```sh
+sudo pacman -Syu
+sudo pacman -S nixit
+```
+
+Updates arrive through your normal `pacman -Syu`.
+
+### From the AUR
+
+AUR account registration is temporarily closed, so this isn't live yet.
+Once it is:
 
 ```sh
 yay -S nixit-git

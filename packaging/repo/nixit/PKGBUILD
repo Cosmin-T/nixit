@@ -1,0 +1,51 @@
+# Maintainer: Cosmin-T <120723446+Cosmin-T@users.noreply.github.com>
+# nixit is a Linux fork of Mole (https://github.com/tw93/Mole) by tw93.
+#
+# This is the release build used for the nixit pacman repo
+# (https://cosmin-t.github.io/nixit) -- a prebuilt binary package, built
+# from a tagged release rather than git HEAD. See packaging/aur/nixit-git
+# for the AUR VCS-package variant (builds from HEAD on the user's machine).
+
+pkgname=nixit
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Clean, uninstall, optimize, analyze and monitor Arch Linux from the terminal (Linux fork of Mole)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Cosmin-T/nixit"
+license=('GPL-3.0-or-later')
+depends=('bash' 'coreutils' 'findutils' 'fzf' 'gawk' 'glib2' 'glibc' 'pacman-contrib' 'procps-ng' 'sed' 'util-linux')
+makedepends=('go')
+optdepends=(
+    'flatpak: uninstall Flatpak apps and remove unused runtimes'
+    'pciutils: show GPU model names in status'
+    'nvidia-utils: NVIDIA GPU usage in status'
+    'xdg-utils: open files and folders from analyze'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Cosmin-T/nixit/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+    go build -ldflags "-s -w -linkmode=external" -o bin/analyze-go ./cmd/analyze
+    go build -ldflags "-s -w -linkmode=external" -o bin/status-go ./cmd/status
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    go test ./...
+    bash tests/run.sh
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    local lib="$pkgdir/usr/lib/$pkgname"
+    install -Dm755 nixit "$lib/nixit"
+    install -Dm755 bin/clean.sh bin/uninstall.sh bin/optimize.sh bin/purge.sh \
+        bin/analyze-go bin/status-go -t "$lib/bin/"
+    install -Dm644 lib/common.sh -t "$lib/lib/"
+    install -d "$pkgdir/usr/bin"
+    ln -s "/usr/lib/$pkgname/nixit" "$pkgdir/usr/bin/nixit"
+    install -Dm644 README.md NOTICE -t "$pkgdir/usr/share/doc/$pkgname/"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
