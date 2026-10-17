@@ -6,19 +6,22 @@
 set -uo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/common.sh"
 
+VERBOSE=0
 declare -a REQUESTED=()
 for arg in "$@"; do
     case "$arg" in
         -n | --dry-run) NIXIT_DRY_RUN=1 ;;
+        -v | --verbose) VERBOSE=1 ;;
         -h | --help)
             cat << EOF
-Usage: nixit uninstall [--dry-run] [package...]
+Usage: nixit uninstall [--dry-run] [--verbose] [package...]
 
 Pick installed packages and Flatpak apps to remove. nixit removes each package
 with its unneeded dependencies (pacman -Rns), then offers to move the app's
 leftover config, data and cache folders to the Trash.
 
   -n, --dry-run   Show what would be removed without changing anything
+  -v, --verbose   Show pacman's full dependency-conflict output, if any
   -h, --help      Show this help
 EOF
             exit 0
@@ -114,9 +117,22 @@ done
 
 if ((${#pkgs[@]} > 0)); then
     printf '%sPackages%s (with dependencies nothing else needs):\n' "$BOLD" "$NC"
-    # pacman -Rns --print lists exactly what would go.
-    pacman -Rs --print --print-format '  %n %v' "${pkgs[@]}" 2> /dev/null ||
+    # pacman -Rs --print lists exactly what would go. When removal would break
+    # another package's dependency, pacman writes a "removing X breaks
+    # dependency..." line to stdout per conflict instead (hundreds for core
+    # packages like glibc), so that's captured and summarized rather than
+    # dumped, unless --verbose asks for the full detail.
+    pacman_print=$(pacman -Rs --print --print-format '  %n %v' "${pkgs[@]}" 2>&1)
+    pacman_status=$?
+    if ((pacman_status == 0)); then
+        printf '%s\n' "$pacman_print"
+    elif ((VERBOSE == 1)); then
+        printf '%s\n' "$pacman_print"
+    else
         printf '  %s\n' "${pkgs[@]}"
+        conflicts=$(grep -c '^:: removing' <<< "$pacman_print")
+        warn "pacman reports removing these would break $conflicts other package dependency/dependencies (see: nixit uninstall --verbose)."
+    fi
 fi
 if ((${#flatpaks[@]} > 0)); then
     printf '%sFlatpak apps:%s\n' "$BOLD" "$NC"
