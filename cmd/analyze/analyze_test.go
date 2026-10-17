@@ -3670,6 +3670,24 @@ func TestResolveScanTargetRouting(t *testing.T) {
 	}
 }
 
+func TestSingleFileJSONOutput(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "big.iso")
+
+	result := singleFileJSONOutput(path, 12345)
+
+	if result.TotalSize != 12345 || result.TotalFiles != 1 {
+		t.Fatalf("expected total_size=12345 total_files=1, got %+v", result)
+	}
+	if len(result.Entries) != 1 {
+		t.Fatalf("expected exactly one entry, got %d", len(result.Entries))
+	}
+	entry := result.Entries[0]
+	if entry.Name != "big.iso" || entry.Path != path || entry.Size != 12345 || entry.IsDir {
+		t.Fatalf("unexpected entry: %+v", entry)
+	}
+}
+
 func mustAbs(t *testing.T, path string) string {
 	t.Helper()
 	abs, err := filepath.Abs(path)

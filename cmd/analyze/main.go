@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -27,7 +28,8 @@ var (
 // bundled binary the user never typed, so the text is written out here instead.
 const usageText = `Usage: nixit analyze [OPTIONS] [PATH]
 
-Explore disk usage. Without PATH, scans a machine-wide overview.
+Explore disk usage. Without PATH, scans a machine-wide overview. PATH can
+also name a single file, which just reports its size.
 
 Options:
   --json          Output the analysis as JSON instead of the interactive TUI
@@ -37,6 +39,7 @@ Examples:
   nixit analyze                 Machine-wide overview
   nixit analyze ~/.cache      Scan one directory
   nixit analyze --json /mnt   Machine-readable output
+  nixit analyze big.iso      Size a single file
 `
 
 // parseArgs applies nixit's CLI conventions to the flag package: help goes to
@@ -74,6 +77,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if info, statErr := os.Stat(abs); statErr == nil && !info.IsDir() {
+		runSingleFileMode(abs, info.Size())
+		return
+	}
+
 	go pruneAnalyzerCache()
 	if *jsonMode {
 		runJSONMode(abs, isOverview)
@@ -103,6 +111,37 @@ func resolveScanTarget(envPath string, args []string) (string, bool, error) {
 		return "", false, fmt.Errorf("cannot resolve %q: %v", target, err)
 	}
 	return abs, false, nil
+}
+
+// runSingleFileMode handles a PATH that names a file rather than a directory.
+// There's nothing to browse, so it skips the scanner and the TUI entirely and
+// just reports that one file's size.
+func runSingleFileMode(path string, size int64) {
+	if *jsonMode {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(singleFileJSONOutput(path, size)); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to encode JSON: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+	fmt.Printf("%s  %s\n", humanizeBytes(size), path)
+}
+
+func singleFileJSONOutput(path string, size int64) jsonOutput {
+	return jsonOutput{
+		Path:       path,
+		ScanStatus: scanComplete,
+		Entries: []jsonEntry{{
+			ScanStatus: scanComplete,
+			Name:       filepath.Base(path),
+			Path:       path,
+			Size:       size,
+		}},
+		TotalSize:  size,
+		TotalFiles: 1,
+	}
 }
 
 func runTUIMode(path string, isOverview bool) {
