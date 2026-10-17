@@ -290,6 +290,29 @@ func TestScanPathConcurrentDedupsHardlinks(t *testing.T) {
 	if !result.dedupedHardlink {
 		t.Fatalf("expected dedupedHardlink flag to be set when a hardlink is deduped")
 	}
+
+	// "nested" and "other" scan concurrently, so whichever encounters its
+	// hardlink second (scan order is not deterministic) is the one left
+	// carrying Deduped on its directory entry; at least one of them must,
+	// so a size reduced by dedup is distinguishable from an empty file.
+	dedupedEntries := 0
+	for _, name := range []string{"nested", "other"} {
+		found := false
+		for _, entry := range result.Entries {
+			if entry.Name == name {
+				found = true
+				if entry.Deduped {
+					dedupedEntries++
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("expected entry %q in result.Entries", name)
+		}
+	}
+	if dedupedEntries == 0 {
+		t.Fatalf("expected at least one of \"nested\"/\"other\" entries to be marked Deduped")
+	}
 }
 
 func TestPerformScanForJSONCountsTopLevelFiles(t *testing.T) {

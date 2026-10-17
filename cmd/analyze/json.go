@@ -32,6 +32,11 @@ type jsonEntry struct {
 	Insight    bool      `json:"insight,omitempty"`
 	Cleanable  bool      `json:"cleanable,omitempty"`
 	LastAccess string    `json:"last_access,omitempty"`
+	// Deduped is true when Size was reduced by hardlink deduplication: a
+	// file whose inode was already counted via another link (so Size may
+	// read 0 here, not because the file is empty), or a directory
+	// containing such a file.
+	Deduped bool `json:"deduped,omitempty"`
 }
 
 type jsonFileEntry struct {
@@ -176,6 +181,7 @@ func jsonEntriesFromDirEntries(entries []dirEntry, isOverview bool, insightPaths
 			Size:       entry.Size,
 			IsDir:      entry.IsDir,
 			Cleanable:  entry.IsDir && isCleanableDir(entry.Path),
+			Deduped:    entry.Deduped,
 		}
 
 		if isOverview {

@@ -77,6 +77,12 @@ type dirEntry struct {
 	Size       int64
 	IsDir      bool
 	LastAccess time.Time
+	// Deduped is true when this entry's Size was reduced by hardlink
+	// deduplication: for a file, another link to the same inode was counted
+	// first so this one shows less (possibly zero); for a directory, this
+	// happened to something inside it. Scan-order dependent, so it is not
+	// cached.
+	Deduped bool
 }
 
 type fileEntry struct {

@@ -435,6 +435,7 @@ scanChildren:
 						State:      result.State,
 						IsDir:      true,
 						LastAccess: time.Time{},
+						Deduped:    result.dedupedHardlink,
 					}, scanSendTimeout)
 				}
 				if limiter.tryAcquireEntry() {
@@ -512,6 +513,7 @@ scanChildren:
 					State:      result.State,
 					IsDir:      true,
 					LastAccess: time.Time{},
+					Deduped:    result.dedupedHardlink,
 				}, scanSendTimeout)
 			}
 			if limiter.tryAcquireEntry() {
@@ -545,6 +547,7 @@ scanChildren:
 			Size:       size,
 			IsDir:      false,
 			LastAccess: getLastAccessTimeFromInfo(info),
+			Deduped:    deduped,
 		}, scanSendTimeout)
 
 		// Track large files only.
