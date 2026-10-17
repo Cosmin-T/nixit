@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 )
@@ -14,14 +15,19 @@ func runWatchMode(interval time.Duration) {
 	runWatchStdout(interval)
 }
 
-// runWatchStdout emits the first snapshot immediately (so the consumer paints
-// without waiting a full interval), then mirrors the TUI cadence: the first
-// usable fast snapshot is followed by an immediate full snapshot, and later
-// ticks wait for the configured interval after each collection finishes. Exits
-// cleanly when stdout closes (parent process gone).
 func runWatchStdout(interval time.Duration) {
 	collector := NewCollector(processWatchOptionsFromFlags())
-	enc := json.NewEncoder(os.Stdout)
+	runWatchLoop(os.Stdout, collector, interval, time.Sleep)
+}
+
+// runWatchLoop emits the first snapshot immediately (so the consumer paints
+// without waiting a full interval), then mirrors the TUI cadence: the first
+// usable fast snapshot is followed by an immediate full snapshot, and later
+// ticks wait for the configured interval after each collection finishes. It
+// returns as soon as a write to w fails, which in production means stdout
+// closed (parent process gone); sleep is a seam so tests can skip real waits.
+func runWatchLoop(w io.Writer, collector *Collector, interval time.Duration, sleep func(time.Duration)) {
+	enc := json.NewEncoder(w)
 	var schedule collectionSchedule
 
 	for {
@@ -32,9 +38,9 @@ func runWatchStdout(interval time.Duration) {
 		}
 		if !result.data.CollectedAt.IsZero() {
 			if err := enc.Encode(result.data); err != nil {
-				return // stdout closed; parent died, nothing left to feed.
+				return
 			}
 		}
-		time.Sleep(delay)
+		sleep(delay)
 	}
 }

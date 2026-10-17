@@ -17,6 +17,57 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 )
 
+// stdoutGoneAfter simulates stdout closing after a fixed number of writes,
+// the same way runWatchLoop sees a dead parent in production: the next
+// Encode call fails and the loop must return instead of looping forever.
+type stdoutGoneAfter struct {
+	buf   bytes.Buffer
+	allow int
+	calls int
+}
+
+func (w *stdoutGoneAfter) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls > w.allow {
+		return 0, errors.New("stdout closed")
+	}
+	return w.buf.Write(p)
+}
+
+// TestRunWatchLoopEmitsNDJSONThenStopsOnWriteError exercises runWatchLoop
+// directly (in-process, unlike TestStatusWatchProcess's subprocess, so this
+// one is visible to `go test -cover`): the first line is a real snapshot
+// emitted with no delay, and a write failure on the next line ends the loop
+// instead of spinning forever.
+func TestRunWatchLoopEmitsNDJSONThenStopsOnWriteError(t *testing.T) {
+	collector := NewCollector(ProcessWatchOptions{})
+	w := &stdoutGoneAfter{allow: 1}
+	var sleeps []time.Duration
+	sleep := func(d time.Duration) { sleeps = append(sleeps, d) }
+
+	done := make(chan struct{})
+	go func() {
+		runWatchLoop(w, collector, time.Second, sleep)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("runWatchLoop did not return after its writer started failing")
+	}
+
+	var snapshot MetricsSnapshot
+	if err := json.Unmarshal(w.buf.Bytes(), &snapshot); err != nil {
+		t.Fatalf("decode emitted line: %v\nraw: %s", err, w.buf.Bytes())
+	}
+	if snapshot.CollectedAt.IsZero() {
+		t.Fatal("expected a usable first snapshot")
+	}
+	if len(sleeps) != 1 || sleeps[0] != 0 {
+		t.Fatalf("sleeps = %v, want exactly one 0-delay sleep (immediate enrichment after the first fast snapshot)", sleeps)
+	}
+}
+
 // Exercise the actual streaming loop in a child so its stdout and collector
 // probes stay isolated from other tests. All external commands are disabled.
 func TestStatusWatchProcess(t *testing.T) {
