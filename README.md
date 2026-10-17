@@ -35,22 +35,24 @@ eating your disk and gives you a live system dashboard, all from one menu.
 
 ## Install
 
-From the nixit pacman repo (prebuilt binary, no AUR account/helper needed).
-Add to `/etc/pacman.conf`:
+```sh
+curl -fsSL https://cosmin-t.github.io/nixit/install.sh | sudo bash
+```
+
+That's it. One command adds the nixit pacman repo and installs it. Updates
+arrive through your normal `sudo pacman -Syu` after that — no AUR helper,
+no editing config files by hand.
+
+<details>
+<summary>Prefer to edit <code>/etc/pacman.conf</code> yourself?</summary>
 
 ```ini
 [nixit]
 Server = https://cosmin-t.github.io/nixit/x86_64
 ```
 
-Then:
-
-```sh
-sudo pacman -Syu
-sudo pacman -S nixit
-```
-
-Updates arrive through your normal `pacman -Syu`.
+Then `sudo pacman -Syu && sudo pacman -S nixit`.
+</details>
 
 ### From the AUR
 
