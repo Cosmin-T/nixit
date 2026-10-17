@@ -3,10 +3,13 @@
 <head><meta charset="utf-8"><title>nixit pacman repo</title></head>
 <body>
 <h1>nixit pacman repository</h1>
-<p>Add to <code>/etc/pacman.conf</code>:</p>
+<p>Install:</p>
+<pre>curl -fsSL https://cosmin-t.github.io/nixit/install.sh | sudo bash</pre>
+<p>That's it — adds the repo and installs nixit in one step. After that,
+updates come through your normal <code>sudo pacman -Syu</code>.</p>
+<p>Prefer to edit <code>/etc/pacman.conf</code> yourself?</p>
 <pre>[nixit]
 Server = https://cosmin-t.github.io/nixit/x86_64</pre>
-<p>Then: <code>sudo pacman -Syu</code> and <code>sudo pacman -S nixit</code>.</p>
 <p>Source: <a href="https://github.com/Cosmin-T/nixit">github.com/Cosmin-T/nixit</a></p>
 </body>
 </html>
